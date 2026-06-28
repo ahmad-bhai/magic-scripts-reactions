@@ -4,7 +4,7 @@ const app = express();
 
 app.use(express.json());
 
-const DEVELOPER = "@Magic_Scripts";
+const DEVELOPER = "@AhmadTrader3";
 
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
