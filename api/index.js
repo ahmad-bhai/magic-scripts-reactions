@@ -11,7 +11,7 @@ const LOG_CHANNEL_ID = "-1003719190943";
 const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; 
 
 // Default Emojis List (Agar user ne customize nahi kiya toh yeh chalenge)
-const DEFAULT_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "🤩"];
+const DEFAULT_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
 
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
