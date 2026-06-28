@@ -78,7 +78,7 @@ app.post('/api/webhook', async (req, res) => {
 
     if (!token) return res.sendStatus(200); 
 
-    const globalEmojis = ["❤️","👍","🔥","🥰","👏","😍","💯","⚡","💋","🏆","❤️‍🔥","🤝","😎","😘","🆒","💘","🤗","🫡","👌",🤩","🎉","🕊️","🦄"];
+    const globalEmojis = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
 
     // ⚡ FEATURE 1: CHANNEL POST REACTION (Auto Reaction for Channels)
     if (update.channel_post) {
@@ -124,7 +124,7 @@ app.post('/api/webhook', async (req, res) => {
 
         // --- AGAR MESSAGE PRIVATE CHAT (DM) MEIN AAYA HAI ---
         if (chatType === 'private' && msgText === '/start') {
-            const startEmojis = ["❤️","👍","🔥","🥰","👏","😍","💯","⚡","💋","🏆","❤️‍🔥","🤝","😎","😘","🆒","💘","🤗","🫡","👌",🤩","🎉","🕊️","🦄"];
+            const startEmojis = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
             const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
             
             await sendTelegramRequest(token, 'setMessageReaction', {
