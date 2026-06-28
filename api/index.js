@@ -10,7 +10,7 @@ const DEVELOPER_PLAIN = "@Magic_Scripts";
 const LOG_CHANNEL_ID = "-1003719190943"; 
 const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; 
 
-// Default Emojis List (Agar user ne customize nahi kiya toh yeh chalenge)
+// Aapki demanded poori 23 Emojis ki List
 const DEFAULT_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
 
 // Helper function: Telegram API hit karne keliye
@@ -83,7 +83,6 @@ app.get('/api', async (req, res) => {
     const status = req.query.status || "true";
     const adminId = req.query.admin || "7476086614"; 
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
-    // By default saari emojis selected rahengi string mein
     const emojisString = req.query.emojis || DEFAULT_EMOJIS.join(",");
 
     if (!token) {
@@ -107,7 +106,6 @@ app.get('/api', async (req, res) => {
     if (status === "true") {
         const encodedMsg = encodeURIComponent(welcomeMsg);
         const domain = req.headers['x-forwarded-host'] || req.headers.host;
-        // Webhook URL ke andar emojis pass ho rahi hain permanent save ke liye
         const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}&emojis=${encodeURIComponent(emojisString)}`;
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
@@ -142,7 +140,7 @@ app.post('/api/webhook', async (req, res) => {
 
     if (!token) return res.sendStatus(200); 
 
-    // URL se active emojis array banao, agar khali ho toh default use karo
+    // Active emojis read karna URL params se
     let activeEmojis = rawEmojis ? decodeURIComponent(rawEmojis).split(",") : DEFAULT_EMOJIS;
     if (activeEmojis.length === 0 || activeEmojis[0] === "") activeEmojis = DEFAULT_EMOJIS;
 
@@ -162,7 +160,7 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 2: MESSAGES HANDLER (Groups & Private)
+    // ⚡ FEATURE 2: MESSAGES HANDLER
     if (update.message) {
         const message = update.message;
         const chatId = message.chat.id;
@@ -216,7 +214,7 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS & CUSTOM EMOJIS SYSTEM
+    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS & 23 EMOJIS CUSTOM SYSTEM
     if (update.callback_query) {
         const callbackQuery = update.callback_query;
         const callbackData = callbackQuery.data;
@@ -240,7 +238,6 @@ app.post('/api/webhook', async (req, res) => {
             });
         };
 
-        // --- MAIN BUTTON ROUTING ---
         if (callbackData === 'lang_en') {
             const text = `*Hello Dear User*!\n\n*I am Reaction Bot 🤖!*\n\n🚀 *Developer:* ${DEVELOPER}`;
             const keyboard = [
@@ -271,45 +268,54 @@ app.post('/api/webhook', async (req, res) => {
             await editMessage(text, keyboard);
         }
 
-        // --- 🎭 EMOJIS CUSTOMIZATION CORE LOGIC ---
+        // --- 🎭 23 EMOJIS CUSTOMIZATION CORE LOGIC (Using Index Compression) ---
         if (callbackData === 'cust_emojis' || callbackData.startsWith('tgl_')) {
-            // Agar toggle hit hua hai, toh dynamic changes parse karo
+            
             if (callbackData.startsWith('tgl_')) {
-                const targetEmoji = callbackData.split("_")[1];
-                if (activeEmojis.includes(targetEmoji)) {
-                    // Agar pehle se hai toh unselect karo (nikalo list se)
-                    activeEmojis = activeEmojis.filter(e => e !== targetEmoji);
-                } else {
-                    // Agar nahi hai toh select karo (add karo list me)
-                    activeEmojis.push(targetEmoji);
-                }
+                const targetIndex = parseInt(callbackData.split("_")[1], 10);
+                const targetEmoji = DEFAULT_EMOJIS[targetIndex];
 
-                // Nayi updated string banao aur Webhook URL background mein change kar do!
-                const nextEmojisStr = activeEmojis.join(",");
-                const encodedMsg = encodeURIComponent(welcomeMsg);
-                const domain = req.headers['x-forwarded-host'] || req.headers.host;
-                const nextWebhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}&emojis=${encodeURIComponent(nextEmojisStr)}`;
-                
-                await sendTelegramRequest(token, 'setWebhook', { url: nextWebhookUrl });
+                if (targetEmoji) {
+                    if (activeEmojis.includes(targetEmoji)) {
+                        // Unselect karo
+                        activeEmojis = activeEmojis.filter(e => e !== targetEmoji);
+                    } else {
+                        // Select karo
+                        activeEmojis.push(targetEmoji);
+                    }
+
+                    // Naya webhook update save logic
+                    const nextEmojisStr = activeEmojis.join(",");
+                    const encodedMsg = encodeURIComponent(welcomeMsg);
+                    const domain = req.headers['x-forwarded-host'] || req.headers.host;
+                    const nextWebhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}&emojis=${encodeURIComponent(nextEmojisStr)}`;
+                    
+                    await sendTelegramRequest(token, 'setWebhook', { url: nextWebhookUrl });
+                }
             }
 
-            // Inline buttons build karne ka logic (Tick mark dynamic lagane ke liye)
+            // Grid Layout: 23 Emojis ko 4-4 ke groups mein khoobsurat rows mein set kiya hai
             let emojiButtons = [];
-            for (let i = 0; i < DEFAULT_EMOJIS.length; i += 3) {
-                let row = [];
-                for (let j = i; j < i + 3 && j < DEFAULT_EMOJIS.length; j++) {
-                    const emo = DEFAULT_EMOJIS[j];
-                    const isSelected = activeEmojis.includes(emo);
-                    // Agar selected hai to aage ✔️ lagao, varna normal dikhao
-                    const btnText = isSelected ? `${emo} ✔️` : `${emo}`;
-                    row.push({ text: btnText, callback_data: `tgl_${emo}` });
+            let currentRow = [];
+            
+            for (let i = 0; i < DEFAULT_EMOJIS.length; i++) {
+                const emo = DEFAULT_EMOJIS[i];
+                const isSelected = activeEmojis.includes(emo);
+                const btnText = isSelected ? `${emo} ✔️` : `${emo}`;
+                
+                // callback_data mein emoji ke bajay sirf index 'i' ja raha hai (Safe against 64-byte crash)
+                currentRow.push({ text: btnText, callback_data: `tgl_${i}` });
+
+                if (currentRow.length === 4 || i === DEFAULT_EMOJIS.length - 1) {
+                    emojiButtons.push(currentRow);
+                    currentRow = [];
                 }
-                emojiButtons.push(row);
             }
-            // Back button settings menu ke liye
+            
+            // Back menu key
             emojiButtons.push([{ text: "🔙 Save & Back", callback_data: "bot_settings" }]);
 
-            const text = `🎭 *Customize Bot Reactions*\n\nJis emoji par click karenge woh select/unselect ho jayegi.\n\n*Active Emojis:* ${activeEmojis.join(" ")}`;
+            const text = `🎭 *Customize Bot Reactions*\n\nJis emoji par click karenge woh active/deactive ho jayegi.\n\n*Active Emojis (${activeEmojis.length}):* \n${activeEmojis.join(" ")}`;
             await editMessage(text, emojiButtons);
         }
 
