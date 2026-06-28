@@ -4,9 +4,9 @@ const app = express();
 
 app.use(express.json());
 
-// Developer Name Updated (Markdown Safe string for messages)
+// Developer Name Configuration
 const DEVELOPER = "@Magic\\_Scripts"; 
-const DEVELOPER_PLAIN = "@Magic_Scripts"; // For URLs and Plain Text
+const DEVELOPER_PLAIN = "@Magic_Scripts"; 
 
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
@@ -53,7 +53,7 @@ app.get('/api', async (req, res) => {
         if (data.ok) {
             return res.json({ 
                 status: "success", 
-                message: "Bot successfully installed and configured!",
+                message: "Bot successfully installed and configured for Groups & Channels!",
                 developer: DEVELOPER_PLAIN 
             });
         } else {
@@ -70,7 +70,7 @@ app.get('/api', async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 2. WEBHOOK ENDPOINT: Channels aur Private Messages ka Main Handler
+// 2. WEBHOOK ENDPOINT: Channels, Groups aur Private Messages ka Handler
 // -------------------------------------------------------------
 app.post('/api/webhook', async (req, res) => {
     const { token, admin: adminId, msg: welcomeMsg } = req.query;
@@ -78,14 +78,15 @@ app.post('/api/webhook', async (req, res) => {
 
     if (!token) return res.sendStatus(200); 
 
-    // ⚡ FEATURE 1: CHANNEL POST REACTION (Auto Reaction)
+    const globalEmojis = ["👍", "❤️", "🔥", "🥰", "🎉", "🤩", "👌", "😍", "💯", "⚡", "😎"];
+
+    // ⚡ FEATURE 1: CHANNEL POST REACTION (Auto Reaction for Channels)
     if (update.channel_post) {
         const channelPost = update.channel_post;
         const msgId = channelPost.message_id;
-        const chatId = channelPost.chat.id;
+        const chatId = channelPost.chat.id; 
         
-        const channelEmojis = ["👍", "❤️", "🔥", "🥰", "🎉", "🤩", "👌", "😍", "💯", "⚡", "😎"];
-        const randomEmoji = channelEmojis[Math.floor(Math.random() * channelEmojis.length)];
+        const randomEmoji = globalEmojis[Math.floor(Math.random() * globalEmojis.length)];
 
         await sendTelegramRequest(token, 'setMessageReaction', {
             chat_id: chatId,
@@ -97,15 +98,32 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 2: PRIVATE MESSAGES (/start & Admin Alert)
+    // ⚡ FEATURE 2: MESSAGES HANDLER (Groups aur Private Dono Keliye)
     if (update.message) {
         const message = update.message;
         const chatId = message.chat.id;
-        const msgText = message.text ? message.text.trim() : "";
         const msgId = message.message_id;
+        const chatType = message.chat.type; // 'private', 'group', 'supergroup'
+        const msgText = message.text ? message.text.trim() : "";
         const user = message.from;
 
-        if (msgText === '/start') {
+        // --- AGAR MESSAGE GROUP YA SUPERGROUP MEIN AAYA HAI ---
+        if (chatType === 'group' || chatType === 'supergroup') {
+            const randomGroupEmoji = globalEmojis[Math.floor(Math.random() * globalEmojis.length)];
+            
+            // Kisi bhi member ke *KISI BHI* message par instant reaction lagao
+            await sendTelegramRequest(token, 'setMessageReaction', {
+                chat_id: chatId,
+                message_id: msgId,
+                reaction: JSON.stringify([{ type: "emoji", emoji: randomGroupEmoji }]),
+                is_big: false
+            });
+            
+            return res.sendStatus(200);
+        }
+
+        // --- AGAR MESSAGE PRIVATE CHAT (DM) MEIN AAYA HAI ---
+        if (chatType === 'private' && msgText === '/start') {
             const startEmojis = ["👍", "❤️", "🔥", "🥰", "💯", "⚡", "😎"];
             const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
             
@@ -201,7 +219,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'sys_info') {
-            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Ahmad Bhai.`;
+            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Magic Scripts.`;
             const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]];
             await editMessage(text, keyboard);
         }
