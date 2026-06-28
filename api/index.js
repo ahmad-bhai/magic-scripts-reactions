@@ -38,7 +38,7 @@ app.get('/api', async (req, res) => {
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
 
     if (!token) {
-        return res.status(400).json({ status: "invalid", message: "Please enter a valid bot token!" });
+        return res.status(400).json({ status: "error", message: "Token missing bhai!" });
     }
 
     if (status === "true") {
@@ -195,7 +195,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'bot_settings') {
-            const text = `🛠️ *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n📌 *Note:* Updates settings set dynamically from an api call.\n\n👑 *System Owner:* ${DEVELOPER}`;
+            const text = `🛠️ *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n📌 *Note:* Settings updates api call se dynamically set hoti hain.\n\n👑 *System Owner:* ${DEVELOPER}`;
             const keyboard = [
                 [{ text: "ℹ️ System Info", callback_data: "sys_info" }],
                 [{ text: "🔙 Back to Menu", callback_data: "back_to_main" }]
@@ -204,7 +204,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'sys_info') {
-            const text = `ℹ️ *System Specification*\n\n• *Engine:* @Magic_Scripts_Official\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Magic_Scripts.`;
+            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by AhmadTrader3.`;
             const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]];
             await editMessage(text, keyboard);
         }
