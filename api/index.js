@@ -315,7 +315,7 @@ app.post('/api/webhook', async (req, res) => {
             // Back menu key
             emojiButtons.push([{ text: "🔙 Save & Back", callback_data: "bot_settings" }]);
 
-            const text = `🎭 *Customize Bot Reactions*\n\nJis emoji par click karenge woh active/deactive ho jayegi.\n\n*Active Emojis (${activeEmojis.length}):* \n${activeEmojis.join(" ")}`;
+            const text = `🎭 *Customize Bot Reactions*\n\nThe emoji you click on will be activated/deactivated.\n\n*Active Emojis (${activeEmojis.length}):* \n${activeEmojis.join(" ")}`;
             await editMessage(text, emojiButtons);
         }
 
