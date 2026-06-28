@@ -4,7 +4,9 @@ const app = express();
 
 app.use(express.json());
 
-const DEVELOPER = "@AhmadTrader3";
+// Developer Name Updated (Markdown Safe string for messages)
+const DEVELOPER = "@Magic\\_Scripts"; 
+const DEVELOPER_PLAIN = "@Magic_Scripts"; // For URLs and Plain Text
 
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
@@ -38,7 +40,7 @@ app.get('/api', async (req, res) => {
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
 
     if (!token) {
-        return res.status(400).json({ status: "error", message: "Please enter a valid bot token!" });
+        return res.status(400).json({ status: "error", message: "Token missing bhai!" });
     }
 
     if (status === "true") {
@@ -52,7 +54,7 @@ app.get('/api', async (req, res) => {
             return res.json({ 
                 status: "success", 
                 message: "Bot successfully installed and configured!",
-                developer: DEVELOPER 
+                developer: DEVELOPER_PLAIN 
             });
         } else {
             return res.status(400).json({ status: "error", telegram_error: data.description });
@@ -80,7 +82,7 @@ app.post('/api/webhook', async (req, res) => {
     if (update.channel_post) {
         const channelPost = update.channel_post;
         const msgId = channelPost.message_id;
-        const chatId = channelPost.chat.id; // Corrected chat ID reading for channels
+        const chatId = channelPost.chat.id;
         
         const channelEmojis = ["👍", "❤️", "🔥", "🥰", "🎉", "🤩", "👌", "😍", "💯", "⚡", "😎"];
         const randomEmoji = channelEmojis[Math.floor(Math.random() * channelEmojis.length)];
@@ -104,7 +106,6 @@ app.post('/api/webhook', async (req, res) => {
         const user = message.from;
 
         if (msgText === '/start') {
-            // 1. Private Chat par pehle reaction lagao
             const startEmojis = ["👍", "❤️", "🔥", "🥰", "💯", "⚡", "😎"];
             const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
             
@@ -115,11 +116,9 @@ app.post('/api/webhook', async (req, res) => {
                 is_big: false
             });
 
-            // Name formating
             const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
             const username = user.username ? `@${user.username}` : "None";
 
-            // 2. Admin Alert Notification Send karein
             if (adminId) {
                 const adminText = `⭐ *New User Notification* ⭐\n\n*Name:* ${fullName}\n*Username:* ${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER} ❤️`;
                 await sendTelegramRequest(token, 'sendMessage', {
@@ -129,12 +128,10 @@ app.post('/api/webhook', async (req, res) => {
                 });
             }
 
-            // 3. Process dynamic fields in Welcome Message
             let finalWelcome = welcomeMsg
                 .replace(/{name}/g, fullName)
                 .replace(/{username}/g, username);
 
-            // 4. Send Menu with Inline Buttons
             await sendTelegramRequest(token, 'sendMessage', {
                 chat_id: chatId,
                 text: `*${finalWelcome}*\n\n🤖 *Bot System Menu:*`,
@@ -195,7 +192,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'bot_settings') {
-            const text = `🛠️ *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n📌 *Note:* Updates settings set dynamically from an api call.\n\n👑 *System Owner:* ${DEVELOPER}`;
+            const text = `🛠️ *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n📌 *Note:* Settings updates api call se dynamically set hoti hain.\n\n👑 *System Owner:* ${DEVELOPER}`;
             const keyboard = [
                 [{ text: "ℹ️ System Info", callback_data: "sys_info" }],
                 [{ text: "🔙 Back to Menu", callback_data: "back_to_main" }]
@@ -204,7 +201,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'sys_info') {
-            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by AhmadTrader3.`;
+            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Magic_Scripts.`;
             const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]];
             await editMessage(text, keyboard);
         }
@@ -222,7 +219,6 @@ app.post('/api/webhook', async (req, res) => {
             await editMessage(text, keyboard);
         }
 
-        // Remove loading state from button
         await sendTelegramRequest(token, 'answerCallbackQuery', { callback_query_id: callbackQuery.id });
     }
 
