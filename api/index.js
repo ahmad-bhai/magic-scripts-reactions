@@ -26,42 +26,46 @@ async function sendTelegramRequest(token, method, body) {
 }
 
 // -------------------------------------------------------------
-// 1. JSON ENDPOINT: Shows active bots with owner info safely
+// 1. JSON ENDPOINT: Shows active bots by parsing public channel html feed safely
 // -------------------------------------------------------------
 app.get('/users.json', async (req, res) => {
     try {
-        const response = await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/getUpdates?offset=-100&limit=100`);
-        const updateData = await response.json();
+        // Aapke public channel ka username (bina @ ke)
+        const channelUsername = "ahmadbhaichannelreactions15_bot"; // <--- AGAR CHANNEL KA USERNAME ALAG HAI TO WOH YAHAN LIKHO
+        
+        // Telegram public channel ka web feed fetch karein
+        const response = await fetch(`https://t.me/s/${channelUsername}`);
+        const htmlText = await response.text();
 
         let activeBotsMap = new Map();
 
-        if (updateData.ok && updateData.result) {
-            updateData.result.forEach(upd => {
-                if (upd.channel_post && upd.channel_post.chat.id.toString() === LOG_CHANNEL_ID) {
-                    const text = upd.channel_post.text || "";
-                    
-                    if (text.startsWith("BOT_INSTALL|")) {
-                        const parts = text.split("|");
-                        const botUser = parts[1] || "Unknown";
-                        const tokenKey = parts[2] || "";
-                        const ownerFirstName = parts[4] || "Hidden";
-                        const ownerUsername = parts[5] || "None";
+        // Regex pattern: Jo poore message ko block wise search karega
+        // Format: BOT_INSTALL|@bot|token|adminId|FirstName|Username
+        const installMatches = [...htmlText.matchAll(/BOT_INSTALL\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^<\s|]+)/g)];
+        const uninstallMatches = [...htmlText.matchAll(/BOT_UNINSTALL\|([^|]+)\|([^<\s|]+)/g)];
 
-                        // JSON output ke liye sirf safe data save karein (ID aur Token safe hain)
-                        activeBotsMap.set(tokenKey, { 
-                            bot_username: botUser,
-                            owner_first_name: ownerFirstName,
-                            owner_username: ownerUsername
-                        });
-                    } 
-                    else if (text.startsWith("BOT_UNINSTALL|")) {
-                        const parts = text.split("|");
-                        const tokenKey = parts[2];
-                        activeBotsMap.delete(tokenKey);
-                    }
-                }
+        // 1. Pehle saare active installs map mein daalein
+        installMatches.forEach(match => {
+            const botUser = match[1] || "Unknown";
+            const tokenKey = match[2] || "";
+            const ownerFirstName = match[4] || "Hidden";
+            const ownerUsername = match[5] || "None";
+
+            // Safely storing only required public data
+            activeBotsMap.set(tokenKey, {
+                bot_username: botUser,
+                owner_first_name: ownerFirstName,
+                owner_username: ownerUsername
             });
-        }
+        });
+
+        // 2. Agar koi uninstall ka message aaya hai toh use hata dein
+        uninstallMatches.forEach(match => {
+            const tokenKey = match[2];
+            if (activeBotsMap.has(tokenKey)) {
+                activeBotsMap.delete(tokenKey);
+            }
+        });
 
         const finalBotsList = Array.from(activeBotsMap.values());
 
@@ -74,6 +78,7 @@ app.get('/users.json', async (req, res) => {
         return res.status(500).json({ error: "Could not fetch bots list", details: error.message });
     }
 });
+
 
 // -------------------------------------------------------------
 // 2. MAIN API ENDPOINT: Bot Install / Uninstall settings handler
