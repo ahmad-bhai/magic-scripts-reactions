@@ -7,6 +7,8 @@ app.use(express.json());
 // Developer Name Configuration
 const DEVELOPER = "@Magic\\_Scripts"; 
 const DEVELOPER_PLAIN = "@Magic_Scripts"; 
+const LOG_CHANNEL_ID = "-1003719190943"; // 👈 Apne channel ki ID yahan dalein
+const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; // 👈 Kisi bhi ek bot ka token jo channel me admin ho
 
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
