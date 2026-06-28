@@ -40,7 +40,7 @@ app.get('/api', async (req, res) => {
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
 
     if (!token) {
-        return res.status(400).json({ status: "error", message: "Token missing bhai!" });
+        return res.status(400).json({ status: "Not Found", message: "Please enter a valid bot token!" });
     }
 
     if (status === "true") {
@@ -78,7 +78,7 @@ app.post('/api/webhook', async (req, res) => {
 
     if (!token) return res.sendStatus(200); 
 
-    const globalEmojis = ["👍", "❤️", "🔥", "🥰", "🎉", "🤩", "👌", "😍", "💯", "⚡", "😎"];
+    const globalEmojis = ["👍", "❤️", "🔥", "🥰", "🎉", "🤩", "👌", "😍", "💯", "⚡", "😎","💘"];
 
     // ⚡ FEATURE 1: CHANNEL POST REACTION (Auto Reaction for Channels)
     if (update.channel_post) {
@@ -124,7 +124,7 @@ app.post('/api/webhook', async (req, res) => {
 
         // --- AGAR MESSAGE PRIVATE CHAT (DM) MEIN AAYA HAI ---
         if (chatType === 'private' && msgText === '/start') {
-            const startEmojis = ["👍", "❤️", "🔥", "🥰", "💯", "⚡", "😎"];
+            const startEmojis = ["👍", "❤️", "🔥", "🥰", "💯", "⚡", "😎","💘"];
             const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
             
             await sendTelegramRequest(token, 'setMessageReaction', {
