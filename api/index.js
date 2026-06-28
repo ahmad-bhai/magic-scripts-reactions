@@ -6,13 +6,28 @@ app.use(express.json());
 
 const DEVELOPER = "@AhmadTrader3";
 
+// Helper function: Telegram API hit karne keliye
+async function sendTelegramRequest(token, method, body) {
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        return await response.json();
+    } catch (e) {
+        console.error(`Error in Telegram API (${method}):`, e);
+        return { ok: false, error: e.message };
+    }
+}
+
 // -------------------------------------------------------------
-// 1. MAIN API ENDPOINT: Bot Install / Uninstall karne keliye
+// 1. MAIN API ENDPOINT: Bot Install / Uninstall settings handler
 // -------------------------------------------------------------
 app.get('/api', async (req, res) => {
     const fullUrl = req.url;
-    
     let token = req.query.token;
+    
     if (!token && fullUrl.includes('token=')) {
         const match = fullUrl.match(/token=([^&]+)/);
         if (match) token = match[1];
@@ -26,47 +41,34 @@ app.get('/api', async (req, res) => {
         return res.status(400).json({ status: "error", message: "Token missing bhai!" });
     }
 
-    const baseTelegramUrl = `https://api.telegram.org/bot${token}`;
-
     if (status === "true") {
         const encodedMsg = encodeURIComponent(welcomeMsg);
         const domain = req.headers['x-forwarded-host'] || req.headers.host;
         const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}`;
 
-        try {
-            const response = await fetch(`${baseTelegramUrl}/setWebhook?url=${webhookUrl}`);
-            const data = await response.json();
+        const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
 
-            if (data.ok) {
-                return res.json({ 
-                    status: "success", 
-                    message: "Bot successfully installed and configured!",
-                    developer: DEVELOPER 
-                });
-            } else {
-                return res.status(400).json({ status: "error", telegram_error: data.description });
-            }
-        } catch (err) {
-            return res.status(500).json({ status: "error", message: err.message });
+        if (data.ok) {
+            return res.json({ 
+                status: "success", 
+                message: "Bot successfully installed and configured!",
+                developer: DEVELOPER 
+            });
+        } else {
+            return res.status(400).json({ status: "error", telegram_error: data.description });
         }
     } else {
-        try {
-            const response = await fetch(`${baseTelegramUrl}/deleteWebhook`);
-            const data = await response.json();
-            
-            if (data.ok) {
-                return res.json({ status: "success", message: "Bot successfully uninstalled!" });
-            } else {
-                return res.status(400).json({ status: "error", telegram_error: data.description });
-            }
-        } catch (err) {
-            return res.status(500).json({ status: "error", message: err.message });
+        const data = await sendTelegramRequest(token, 'deleteWebhook', {});
+        if (data.ok) {
+            return res.json({ status: "success", message: "Bot successfully uninstalled!" });
+        } else {
+            return res.status(400).json({ status: "error", telegram_error: data.description });
         }
     }
 });
 
 // -------------------------------------------------------------
-// 2. WEBHOOK ENDPOINT: Telegram Updates Handle Karne Keliye
+// 2. WEBHOOK ENDPOINT: Channels aur Private Messages ka Main Handler
 // -------------------------------------------------------------
 app.post('/api/webhook', async (req, res) => {
     const { token, admin: adminId, msg: welcomeMsg } = req.query;
@@ -74,27 +76,16 @@ app.post('/api/webhook', async (req, res) => {
 
     if (!token) return res.sendStatus(200); 
 
-    const sendApi = async (method, body) => {
-        try {
-            await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-        } catch (e) {
-            console.error("Telegram API Error:", e);
-        }
-    };
-
-    // ⚡ FEATURE: CHANNEL POST REACTION
+    // ⚡ FEATURE 1: CHANNEL POST REACTION (Auto Reaction)
     if (update.channel_post) {
-        const msgId = update.channel_post.message_id;
-        const chatId = update.channel_post.sender_chat.id;
+        const channelPost = update.channel_post;
+        const msgId = channelPost.message_id;
+        const chatId = channelPost.chat.id; // Corrected chat ID reading for channels
         
-        const myEmojis = ["👍", "❤️", "🔥", "🥰", "🎉", "🤩", "👌", "😍", "💯", "⚡", "😎"];
-        const randomEmoji = myEmojis[Math.floor(Math.random() * myEmojis.length)];
+        const channelEmojis = ["👍", "❤️", "🔥", "🥰", "🎉", "🤩", "👌", "😍", "💯", "⚡", "😎"];
+        const randomEmoji = channelEmojis[Math.floor(Math.random() * channelEmojis.length)];
 
-        await sendApi('setMessageReaction', {
+        await sendTelegramRequest(token, 'setMessageReaction', {
             chat_id: chatId,
             message_id: msgId,
             reaction: JSON.stringify([{ type: "emoji", emoji: randomEmoji }]),
@@ -104,39 +95,49 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // Handle normal private messages
-    if (update.message && update.message.text) {
-        const chatId = update.message.chat.id;
-        const msgText = update.message.text;
-        const msgId = update.message.message_id;
-        const user = update.message.from;
-        const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+    // ⚡ FEATURE 2: PRIVATE MESSAGES (/start & Admin Alert)
+    if (update.message) {
+        const message = update.message;
+        const chatId = message.chat.id;
+        const msgText = message.text ? message.text.trim() : "";
+        const msgId = message.message_id;
+        const user = message.from;
 
-        // 🚀 Command: /start
         if (msgText === '/start') {
-            const startEmojis = ["👍", "❤️", "🔥", "🥰", "💯", "⚡", "🏆", "😎"];
+            // 1. Private Chat par pehle reaction lagao
+            const startEmojis = ["👍", "❤️", "🔥", "🥰", "💯", "⚡", "😎"];
             const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
-            await sendApi('setMessageReaction', {
+            
+            await sendTelegramRequest(token, 'setMessageReaction', {
                 chat_id: chatId,
                 message_id: msgId,
                 reaction: JSON.stringify([{ type: "emoji", emoji: randomStartEmoji }]),
                 is_big: false
             });
 
+            // Name formating
+            const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+            const username = user.username ? `@${user.username}` : "None";
+
+            // 2. Admin Alert Notification Send karein
             if (adminId) {
-                const adminText = `⭐ *New User Notification* ⭐\n\n*Name:* ${fullName}\n*Username:* @${user.username || "None"}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER} ❤️`;
-                await sendApi('sendMessage', {
+                const adminText = `⭐ *New User Notification* ⭐\n\n*Name:* ${fullName}\n*Username:* ${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER} ❤️`;
+                await sendTelegramRequest(token, 'sendMessage', {
                     chat_id: adminId,
                     text: adminText,
                     parse_mode: "Markdown"
                 });
             }
 
-            let personalizedMsg = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, user.username || "None");
+            // 3. Process dynamic fields in Welcome Message
+            let finalWelcome = welcomeMsg
+                .replace(/{name}/g, fullName)
+                .replace(/{username}/g, username);
 
-            await sendApi('sendMessage', {
+            // 4. Send Menu with Inline Buttons
+            await sendTelegramRequest(token, 'sendMessage', {
                 chat_id: chatId,
-                text: `*${personalizedMsg}*\n\n🤖 *Bot System Menu:*`,
+                text: `*${finalWelcome}*\n\n🤖 *Bot System Menu:*`,
                 parse_mode: "Markdown",
                 reply_markup: {
                     inline_keyboard: [
@@ -146,9 +147,10 @@ app.post('/api/webhook', async (req, res) => {
                 }
             });
         }
+        return res.sendStatus(200);
     }
 
-    // 📊 CALLBACK QUERY: Inline Buttons
+    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS (Callback Queries)
     if (update.callback_query) {
         const callbackQuery = update.callback_query;
         const callbackData = callbackQuery.data;
@@ -157,13 +159,13 @@ app.post('/api/webhook', async (req, res) => {
         const user = callbackQuery.from;
         
         let botName = "bot";
-        try {
-            const botDetails = await (await fetch(`https://api.telegram.org/bot${token}/getMe`)).json();
-            botName = botDetails.result ? botDetails.result.username : "bot";
-        } catch(e) {}
+        const botDetails = await sendTelegramRequest(token, 'getMe', {});
+        if (botDetails && botDetails.ok && botDetails.result) {
+            botName = botDetails.result.username;
+        }
 
         const editMessage = async (text, keyboard) => {
-            await sendApi('editMessageText', {
+            await sendTelegramRequest(token, 'editMessageText', {
                 chat_id: chatId,
                 message_id: messageId,
                 text: text,
@@ -192,7 +194,6 @@ app.post('/api/webhook', async (req, res) => {
             await editMessage(text, keyboard);
         }
 
-        // ⚙️ INLINE SETTINGS PANEL
         if (callbackData === 'bot_settings') {
             const text = `🛠️ *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n📌 *Note:* Settings updates api call se dynamically set hoti hain.\n\n👑 *System Owner:* ${DEVELOPER}`;
             const keyboard = [
@@ -204,13 +205,16 @@ app.post('/api/webhook', async (req, res) => {
 
         if (callbackData === 'sys_info') {
             const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by AhmadTrader3.`;
-            const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]]; // FIXED LINE HERE
+            const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]];
             await editMessage(text, keyboard);
         }
 
         if (callbackData === 'back_to_main') {
-            let personalizedMsg = welcomeMsg.replace(/{name}/g, user.first_name || "User");
-            const text = `*${personalizedMsg}*\n\n🤖 *Bot System Menu:*`;
+            const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+            const username = user.username ? `@${user.username}` : "None";
+            let finalWelcome = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, username);
+            
+            const text = `*${finalWelcome}*\n\n🤖 *Bot System Menu:*`;
             const keyboard = [
                 [{ text: "🇬🇧 English", callback_data: "lang_en" }, { text: "🇵🇰 Urdu", callback_data: "lang_ur" }],
                 [{ text: "⚙️ Bot Settings Panel", callback_data: "bot_settings" }]
@@ -218,7 +222,8 @@ app.post('/api/webhook', async (req, res) => {
             await editMessage(text, keyboard);
         }
 
-        await sendApi('answerCallbackQuery', { callback_query_id: callbackQuery.id });
+        // Remove loading state from button
+        await sendTelegramRequest(token, 'answerCallbackQuery', { callback_query_id: callbackQuery.id });
     }
 
     res.sendStatus(200);
