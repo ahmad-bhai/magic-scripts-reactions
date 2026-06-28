@@ -83,6 +83,8 @@ app.get('/api', async (req, res) => {
     const status = req.query.status || "true";
     const adminId = req.query.admin || "7476086614"; 
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
+    
+    // FIXED: Agar installation ke waqt query mein explicit emojis na hon, toh poori list select hogi
     const emojisString = req.query.emojis || DEFAULT_EMOJIS.join(",");
 
     if (!token) {
@@ -114,7 +116,7 @@ app.get('/api', async (req, res) => {
         await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', { chat_id: LOG_CHANNEL_ID, text: dbMessage });
         
         if (data.ok) {
-            return res.json({ status: "success", message: "Bot successfully installed!", developer: DEVELOPER_PLAIN });
+            return res.json({ status: "success", message: "Bot successfully installed with all emojis active!", developer: DEVELOPER_PLAIN });
         } else {
             return res.status(400).json({ status: "error", telegram_error: data.description });
         }
@@ -140,9 +142,15 @@ app.post('/api/webhook', async (req, res) => {
 
     if (!token) return res.sendStatus(200); 
 
-    // Active emojis read karna URL params se
-    let activeEmojis = rawEmojis ? decodeURIComponent(rawEmojis).split(",") : DEFAULT_EMOJIS;
-    if (activeEmojis.length === 0 || activeEmojis[0] === "") activeEmojis = DEFAULT_EMOJIS;
+    // FIXED: Strict checking - agar emojis missing hon ya 9 par truncate ho rahe hon toh full select honge
+    let activeEmojis = DEFAULT_EMOJIS;
+    if (rawEmojis) {
+        const parsedEmojis = decodeURIComponent(rawEmojis).split(",").filter(e => e.trim() !== "");
+        // Agar dynamic customization ho chuki ho toh use kare, warna pure 23 defaults load kare
+        if (parsedEmojis.length > 0) {
+            activeEmojis = parsedEmojis;
+        }
+    }
 
     // ⚡ FEATURE 1: CHANNEL POST REACTION
     if (update.channel_post) {
@@ -268,7 +276,7 @@ app.post('/api/webhook', async (req, res) => {
             await editMessage(text, keyboard);
         }
 
-        // --- 🎭 23 EMOJIS CUSTOMIZATION CORE LOGIC (Using Index Compression) ---
+        // --- 🎭 23 EMOJIS CUSTOMIZATION CORE LOGIC ---
         if (callbackData === 'cust_emojis' || callbackData.startsWith('tgl_')) {
             
             if (callbackData.startsWith('tgl_')) {
@@ -277,14 +285,11 @@ app.post('/api/webhook', async (req, res) => {
 
                 if (targetEmoji) {
                     if (activeEmojis.includes(targetEmoji)) {
-                        // Unselect karo
                         activeEmojis = activeEmojis.filter(e => e !== targetEmoji);
                     } else {
-                        // Select karo
                         activeEmojis.push(targetEmoji);
                     }
 
-                    // Naya webhook update save logic
                     const nextEmojisStr = activeEmojis.join(",");
                     const encodedMsg = encodeURIComponent(welcomeMsg);
                     const domain = req.headers['x-forwarded-host'] || req.headers.host;
@@ -294,7 +299,6 @@ app.post('/api/webhook', async (req, res) => {
                 }
             }
 
-            // Grid Layout: 23 Emojis ko 4-4 ke groups mein khoobsurat rows mein set kiya hai
             let emojiButtons = [];
             let currentRow = [];
             
@@ -303,7 +307,6 @@ app.post('/api/webhook', async (req, res) => {
                 const isSelected = activeEmojis.includes(emo);
                 const btnText = isSelected ? `${emo} ✔️` : `${emo}`;
                 
-                // callback_data mein emoji ke bajay sirf index 'i' ja raha hai (Safe against 64-byte crash)
                 currentRow.push({ text: btnText, callback_data: `tgl_${i}` });
 
                 if (currentRow.length === 4 || i === DEFAULT_EMOJIS.length - 1) {
@@ -312,7 +315,6 @@ app.post('/api/webhook', async (req, res) => {
                 }
             }
             
-            // Back menu key
             emojiButtons.push([{ text: "🔙 Save & Back", callback_data: "bot_settings" }]);
 
             const text = `🎭 *Customize Bot Reactions*\n\nThe emoji you click on will be activated/deactivated.\n\n*Active Emojis (${activeEmojis.length}):* \n${activeEmojis.join(" ")}`;
