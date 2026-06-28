@@ -231,3 +231,4 @@ app.post('/api/webhook', async (req, res) => {
 
 // Export functionality for Vercel
 module.exports = app;
+            
