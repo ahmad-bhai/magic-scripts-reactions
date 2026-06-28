@@ -8,13 +8,10 @@ const DEVELOPER = "@AhmadTrader3";
 
 // -------------------------------------------------------------
 // 1. MAIN API ENDPOINT: Bot Install / Uninstall karne keliye
-// URL: https://website.vercel.app/api/token=BOT_TOKEN&status=true&admin=123456&msg=Welcome+To+Bot
 // -------------------------------------------------------------
 app.get('/api', async (req, res) => {
-    // URL se query params nikalna
     const fullUrl = req.url;
     
-    // Custom parser taaki "token=" directly URL path se utha sakein agar format aisa ho
     let token = req.query.token;
     if (!token && fullUrl.includes('token=')) {
         const match = fullUrl.match(/token=([^&]+)/);
@@ -22,7 +19,7 @@ app.get('/api', async (req, res) => {
     }
 
     const status = req.query.status || "true";
-    const adminId = req.query.admin || "7476086614"; // Default admin if missing
+    const adminId = req.query.admin || "7476086614"; 
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
 
     if (!token) {
@@ -32,10 +29,7 @@ app.get('/api', async (req, res) => {
     const baseTelegramUrl = `https://api.telegram.org/bot${token}`;
 
     if (status === "true") {
-        // Encodings taaki special characters URL mein kharab na hon
         const encodedMsg = encodeURIComponent(welcomeMsg);
-        
-        // SERVERLESS TRICK: Saari settings hum Webhook URL ke andar hi daal rahe hain!
         const domain = req.headers['x-forwarded-host'] || req.headers.host;
         const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}`;
 
@@ -56,7 +50,6 @@ app.get('/api', async (req, res) => {
             return res.status(500).json({ status: "error", message: err.message });
         }
     } else {
-        // status=false hone par webhook delete (Uninstall)
         try {
             const response = await fetch(`${baseTelegramUrl}/deleteWebhook`);
             const data = await response.json();
@@ -76,21 +69,24 @@ app.get('/api', async (req, res) => {
 // 2. WEBHOOK ENDPOINT: Telegram Updates Handle Karne Keliye
 // -------------------------------------------------------------
 app.post('/api/webhook', async (req, res) => {
-    // Webhook URL se user ki settings read karna
     const { token, admin: adminId, msg: welcomeMsg } = req.query;
     const update = req.body;
 
-    if (!token) return res.sendStatus(200); // Response 200 dena zaroori hai taaki TG loop na kare
+    if (!token) return res.sendStatus(200); 
 
     const sendApi = async (method, body) => {
-        await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
+        try {
+            await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+        } catch (e) {
+            console.error("Telegram API Error:", e);
+        }
     };
 
-    // ⚡ FEATURE 1: CHANNEL POST REACTION (Auto Reaction System)
+    // ⚡ FEATURE: CHANNEL POST REACTION
     if (update.channel_post) {
         const msgId = update.channel_post.message_id;
         const chatId = update.channel_post.sender_chat.id;
@@ -118,7 +114,6 @@ app.post('/api/webhook', async (req, res) => {
 
         // 🚀 Command: /start
         if (msgText === '/start') {
-            // 1. Send Random Reaction on Start Message
             const startEmojis = ["👍", "❤️", "🔥", "🥰", "💯", "⚡", "🏆", "😎"];
             const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
             await sendApi('setMessageReaction', {
@@ -128,7 +123,6 @@ app.post('/api/webhook', async (req, res) => {
                 is_big: false
             });
 
-            // 2. Admin Notification Alert
             if (adminId) {
                 const adminText = `⭐ *New User Notification* ⭐\n\n*Name:* ${fullName}\n*Username:* @${user.username || "None"}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER} ❤️`;
                 await sendApi('sendMessage', {
@@ -138,10 +132,8 @@ app.post('/api/webhook', async (req, res) => {
                 });
             }
 
-            // 3. Dynamic Welcome Message Text Processing
             let personalizedMsg = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, user.username || "None");
 
-            // 4. Welcome Message with Settings and Lang buttons
             await sendApi('sendMessage', {
                 chat_id: chatId,
                 text: `*${personalizedMsg}*\n\n🤖 *Bot System Menu:*`,
@@ -156,15 +148,19 @@ app.post('/api/webhook', async (req, res) => {
         }
     }
 
-    // 📊 CALLBACK QUERY: Inline Buttons Operations
+    // 📊 CALLBACK QUERY: Inline Buttons
     if (update.callback_query) {
         const callbackQuery = update.callback_query;
         const callbackData = callbackQuery.data;
         const messageId = callbackQuery.message.message_id;
         const chatId = callbackQuery.message.chat.id;
         const user = callbackQuery.from;
-        const botDetails = await (await fetch(`https://api.telegram.org/bot${token}/getMe`)).json();
-        const botName = botDetails.result ? botDetails.result.username : "bot";
+        
+        let botName = "bot";
+        try {
+            const botDetails = await (await fetch(`https://api.telegram.org/bot${token}/getMe`)).json();
+            botName = botDetails.result ? botDetails.result.username : "bot";
+        } catch(e) {}
 
         const editMessage = async (text, keyboard) => {
             await sendApi('editMessageText', {
@@ -208,7 +204,7 @@ app.post('/api/webhook', async (req, res) => {
 
         if (callbackData === 'sys_info') {
             const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by AhmadTrader3.`;
-            const keyboard = [[text = "🔙 Back to Settings", callback_data: "bot_settings"]];
+            const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]]; // FIXED LINE HERE
             await editMessage(text, keyboard);
         }
 
@@ -222,13 +218,10 @@ app.post('/api/webhook', async (req, res) => {
             await editMessage(text, keyboard);
         }
 
-        // Answer callback query to remove loading state
         await sendApi('answerCallbackQuery', { callback_query_id: callbackQuery.id });
     }
 
     res.sendStatus(200);
 });
 
-// Export functionality for Vercel
 module.exports = app;
-            
