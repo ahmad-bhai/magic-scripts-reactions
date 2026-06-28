@@ -201,7 +201,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'sys_info') {
-            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Magic_Scripts.`;
+            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Ahmad Bhai.`;
             const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]];
             await editMessage(text, keyboard);
         }
