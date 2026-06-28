@@ -10,6 +10,9 @@ const DEVELOPER_PLAIN = "@Magic_Scripts";
 const LOG_CHANNEL_ID = "-1003719190943"; 
 const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; 
 
+// Default Emojis List (Agar user ne customize nahi kiya toh yeh chalenge)
+const DEFAULT_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "🤩"];
+
 // Helper function: Telegram API hit karne keliye
 async function sendTelegramRequest(token, method, body) {
     try {
@@ -26,19 +29,15 @@ async function sendTelegramRequest(token, method, body) {
 }
 
 // -------------------------------------------------------------
-// 1. JSON ENDPOINT: Shows active bots via Public Channel Parsing (Fixes 0 issue)
+// 1. JSON ENDPOINT: Shows active bots via Public Channel Parsing
 // -------------------------------------------------------------
 app.get('/users.json', async (req, res) => {
     try {
-        // Aapke public channel ka link text username
         const channelUsername = "AhmadTrader3"; 
-        
         const response = await fetch(`https://t.me/s/${channelUsername}`);
         const htmlText = await response.text();
 
         let activeBotsMap = new Map();
-
-        // Safe Regex patterns logs nikalne ke liye
         const installMatches = [...htmlText.matchAll(/BOT_INSTALL\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^<\s|]+)/g)];
         const uninstallMatches = [...htmlText.matchAll(/BOT_UNINSTALL\|([^|]+)\|([^<\s|]+)/g)];
 
@@ -63,12 +62,7 @@ app.get('/users.json', async (req, res) => {
         });
 
         const finalBotsList = Array.from(activeBotsMap.values());
-
-        return res.json({
-            total_active_bots: finalBotsList.length,
-            bots: finalBotsList
-        });
-
+        return res.json({ total_active_bots: finalBotsList.length, bots: finalBotsList });
     } catch (error) {
         return res.status(500).json({ error: "Could not fetch bots list", details: error.message });
     }
@@ -89,6 +83,8 @@ app.get('/api', async (req, res) => {
     const status = req.query.status || "true";
     const adminId = req.query.admin || "7476086614"; 
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
+    // By default saari emojis selected rahengi string mein
+    const emojisString = req.query.emojis || DEFAULT_EMOJIS.join(",");
 
     if (!token) {
         return res.status(400).json({ status: "Not Found", message: "Please enter a valid bot token!" });
@@ -111,33 +107,23 @@ app.get('/api', async (req, res) => {
     if (status === "true") {
         const encodedMsg = encodeURIComponent(welcomeMsg);
         const domain = req.headers['x-forwarded-host'] || req.headers.host;
-        const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}`;
+        // Webhook URL ke andar emojis pass ho rahi hain permanent save ke liye
+        const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}&emojis=${encodeURIComponent(emojisString)}`;
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
         
         const dbMessage = `BOT_INSTALL|${botUsername}|${token}|${adminId}|${userFirstName}|${userPublicUsername}`;
-        await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', {
-            chat_id: LOG_CHANNEL_ID,
-            text: dbMessage
-        });
+        await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', { chat_id: LOG_CHANNEL_ID, text: dbMessage });
         
         if (data.ok) {
-            return res.json({ 
-                status: "success", 
-                message: "Bot successfully installed and configured!",
-                developer: DEVELOPER_PLAIN 
-            });
+            return res.json({ status: "success", message: "Bot successfully installed!", developer: DEVELOPER_PLAIN });
         } else {
             return res.status(400).json({ status: "error", telegram_error: data.description });
         }
     } else {
         const data = await sendTelegramRequest(token, 'deleteWebhook', {});
-        
         const dbMessage = `BOT_UNINSTALL|${botUsername}|${token}`;
-        await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', {
-            chat_id: LOG_CHANNEL_ID,
-            text: dbMessage
-        });
+        await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', { chat_id: LOG_CHANNEL_ID, text: dbMessage });
 
         if (data.ok) {
             return res.json({ status: "success", message: "Bot successfully uninstalled!" });
@@ -151,19 +137,21 @@ app.get('/api', async (req, res) => {
 // 3. WEBHOOK ENDPOINT: Channels, Groups aur Private Messages ka Handler
 // -------------------------------------------------------------
 app.post('/api/webhook', async (req, res) => {
-    const { token, admin: adminId, msg: welcomeMsg } = req.query;
+    const { token, admin: adminId, msg: welcomeMsg, emojis: rawEmojis } = req.query;
     const update = req.body;
 
     if (!token) return res.sendStatus(200); 
 
-    const globalEmojis = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
+    // URL se active emojis array banao, agar khali ho toh default use karo
+    let activeEmojis = rawEmojis ? decodeURIComponent(rawEmojis).split(",") : DEFAULT_EMOJIS;
+    if (activeEmojis.length === 0 || activeEmojis[0] === "") activeEmojis = DEFAULT_EMOJIS;
 
     // ⚡ FEATURE 1: CHANNEL POST REACTION
     if (update.channel_post) {
         const channelPost = update.channel_post;
         const msgId = channelPost.message_id;
         const chatId = channelPost.chat.id; 
-        const randomEmoji = globalEmojis[Math.floor(Math.random() * globalEmojis.length)];
+        const randomEmoji = activeEmojis[Math.floor(Math.random() * activeEmojis.length)];
 
         await sendTelegramRequest(token, 'setMessageReaction', {
             chat_id: chatId,
@@ -174,7 +162,7 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 2: MESSAGES HANDLER
+    // ⚡ FEATURE 2: MESSAGES HANDLER (Groups & Private)
     if (update.message) {
         const message = update.message;
         const chatId = message.chat.id;
@@ -184,7 +172,7 @@ app.post('/api/webhook', async (req, res) => {
         const user = message.from;
 
         if (chatType === 'group' || chatType === 'supergroup') {
-            const randomGroupEmoji = globalEmojis[Math.floor(Math.random() * globalEmojis.length)];
+            const randomGroupEmoji = activeEmojis[Math.floor(Math.random() * activeEmojis.length)];
             await sendTelegramRequest(token, 'setMessageReaction', {
                 chat_id: chatId,
                 message_id: msgId,
@@ -195,9 +183,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (chatType === 'private' && msgText === '/start') {
-            const startEmojis = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
-            const randomStartEmoji = startEmojis[Math.floor(Math.random() * startEmojis.length)];
-            
+            const randomStartEmoji = activeEmojis[Math.floor(Math.random() * activeEmojis.length)];
             await sendTelegramRequest(token, 'setMessageReaction', {
                 chat_id: chatId,
                 message_id: msgId,
@@ -210,11 +196,7 @@ app.post('/api/webhook', async (req, res) => {
 
             if (adminId) {
                 const adminText = `⭐ *New User Notification* ⭐\n\n*Name:* ${fullName}\n*Username:* ${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER} ❤️`;
-                await sendTelegramRequest(token, 'sendMessage', {
-                    chat_id: adminId,
-                    text: adminText,
-                    parse_mode: "Markdown"
-                });
+                await sendTelegramRequest(token, 'sendMessage', { chat_id: adminId, text: adminText, parse_mode: "Markdown" });
             }
 
             let finalWelcome = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, username);
@@ -234,7 +216,7 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS (Fixes Crash)
+    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS & CUSTOM EMOJIS SYSTEM
     if (update.callback_query) {
         const callbackQuery = update.callback_query;
         const callbackData = callbackQuery.data;
@@ -242,7 +224,6 @@ app.post('/api/webhook', async (req, res) => {
         const chatId = callbackQuery.message.chat.id;
         const user = callbackQuery.from;
         
-        // Fix: getMe hit karke dynamic bot username nikalna callback context mein taaki button link crash na ho
         const currentBot = await sendTelegramRequest(token, 'getMe', {});
         let botName = "bot";
         if (currentBot && currentBot.ok && currentBot.result) {
@@ -259,6 +240,7 @@ app.post('/api/webhook', async (req, res) => {
             });
         };
 
+        // --- MAIN BUTTON ROUTING ---
         if (callbackData === 'lang_en') {
             const text = `*Hello Dear User*!\n\n*I am Reaction Bot 🤖!*\n\n🚀 *Developer:* ${DEVELOPER}`;
             const keyboard = [
@@ -280,12 +262,55 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'bot_settings') {
-            const text = `🛠️ *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n📌 *Note:* Updates settings set dynamically from an api call.\n\n👑 *System Owner:* ${DEVELOPER}`;
+            const text = `🛠 *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n👑 *System Owner:* ${DEVELOPER}`;
             const keyboard = [
+                [{ text: "⚙️ Customize Emojis", callback_data: "cust_emojis" }],
                 [{ text: "ℹ️ System Info", callback_data: "sys_info" }],
                 [{ text: "🔙 Back to Menu", callback_data: "back_to_main" }]
             ];
             await editMessage(text, keyboard);
+        }
+
+        // --- 🎭 EMOJIS CUSTOMIZATION CORE LOGIC ---
+        if (callbackData === 'cust_emojis' || callbackData.startsWith('tgl_')) {
+            // Agar toggle hit hua hai, toh dynamic changes parse karo
+            if (callbackData.startsWith('tgl_')) {
+                const targetEmoji = callbackData.split("_")[1];
+                if (activeEmojis.includes(targetEmoji)) {
+                    // Agar pehle se hai toh unselect karo (nikalo list se)
+                    activeEmojis = activeEmojis.filter(e => e !== targetEmoji);
+                } else {
+                    // Agar nahi hai toh select karo (add karo list me)
+                    activeEmojis.push(targetEmoji);
+                }
+
+                // Nayi updated string banao aur Webhook URL background mein change kar do!
+                const nextEmojisStr = activeEmojis.join(",");
+                const encodedMsg = encodeURIComponent(welcomeMsg);
+                const domain = req.headers['x-forwarded-host'] || req.headers.host;
+                const nextWebhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}&emojis=${encodeURIComponent(nextEmojisStr)}`;
+                
+                await sendTelegramRequest(token, 'setWebhook', { url: nextWebhookUrl });
+            }
+
+            // Inline buttons build karne ka logic (Tick mark dynamic lagane ke liye)
+            let emojiButtons = [];
+            for (let i = 0; i < DEFAULT_EMOJIS.length; i += 3) {
+                let row = [];
+                for (let j = i; j < i + 3 && j < DEFAULT_EMOJIS.length; j++) {
+                    const emo = DEFAULT_EMOJIS[j];
+                    const isSelected = activeEmojis.includes(emo);
+                    // Agar selected hai to aage ✔️ lagao, varna normal dikhao
+                    const btnText = isSelected ? `${emo} ✔️` : `${emo}`;
+                    row.push({ text: btnText, callback_data: `tgl_${emo}` });
+                }
+                emojiButtons.push(row);
+            }
+            // Back button settings menu ke liye
+            emojiButtons.push([{ text: "🔙 Save & Back", callback_data: "bot_settings" }]);
+
+            const text = `🎭 *Customize Bot Reactions*\n\nJis emoji par click karenge woh select/unselect ho jayegi.\n\n*Active Emojis:* ${activeEmojis.join(" ")}`;
+            await editMessage(text, emojiButtons);
         }
 
         if (callbackData === 'sys_info') {
