@@ -8,7 +8,7 @@ app.use(express.json());
 const DEVELOPER = "@Magic\\_Scripts"; 
 const DEVELOPER_PLAIN = "@Magic_Scripts"; 
 const LOG_CHANNEL_ID = "-1003719190943"; 
-const SYSTEM_BOT_TOKEN = "8711492125:AAFtaIG768FBeV0fHAo-tSp7PugIdo2H8Og"; 
+const SYSTEM_BOT_TOKEN = "8711492125:AAFkaSnprdZV9fUAjTYjaHF7Q_Utty7sxqA"; 
 
 // Aapki demanded poori 23 Emojis ki List
 const DEFAULT_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
