@@ -250,208 +250,180 @@
     <script>
         const FIREBASE_URL = "https://magic-scripts-reactions-default-rtdb.firebaseio.com/users.json";
 
-        let currentUserId = "";
-        let currentFullName = "Unknown User";
-        let currentUserName = "None";
+let currentUserId = "";
+let currentFullName = "Unknown User";
+let currentUserName = "None";
 
-        // Step 1: Telegram Gateway Initialization
-        window.addEventListener('DOMContentLoaded', () => {
-            const tg = window.Telegram?.WebApp;
-            
-            if (!tg || !tg.initDataUnsafe || Object.keys(tg.initDataUnsafe).length === 0) {
-                document.getElementById('browserLockScreen').style.display = 'flex';
-                document.getElementById('mainDashboard').style.display = 'none';
-                document.getElementById('suspendedScreen').style.display = 'none';
-                return;
-            }
+// Step 1: Telegram Gateway Initialization
+window.addEventListener('DOMContentLoaded', () => {
+    const tg = window.Telegram?.WebApp;
+    
+    if (!tg || !tg.initDataUnsafe || Object.keys(tg.initDataUnsafe).length === 0) {
+        document.getElementById('browserLockScreen').style.display = 'flex';
+        document.getElementById('mainDashboard').style.display = 'none';
+        document.getElementById('suspendedScreen').style.display = 'none';
+        return;
+    }
 
-            tg.ready();
-            tg.expand();
+    tg.ready();
+    tg.expand();
 
-            const user = tg.initDataUnsafe.user;
-            if (user) {
-                currentUserId = String(user.id);
-                currentFullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
-                currentUserName = user.username ? `@${user.username}` : "None";
-                
-                document.getElementById('tgUid').textContent = currentUserId;
-                document.getElementById('tgName').textContent = currentFullName;
-                document.getElementById('tgUser').textContent = currentUserName;
-                
-                if(!localStorage.getItem('ms_adminId')) {
-                    document.getElementById('adminId').value = currentUserId;
-                }
-            } else {
-                currentUserId = "7476086614"; 
-                document.getElementById('tgUid').textContent = currentUserId;
-            }
+    const user = tg.initDataUnsafe.user;
+    if (user) {
+        currentUserId = String(user.id);
+        currentFullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+        currentUserName = user.username ? `@${user.username}` : "None";
+        
+        document.getElementById('tgUid').textContent = currentUserId;
+        document.getElementById('tgName').textContent = currentFullName;
+        document.getElementById('tgUser').textContent = currentUserName;
+        
+        if(!localStorage.getItem('ms_adminId')) {
+            document.getElementById('adminId').value = currentUserId;
+        }
+    } else {
+        currentUserId = "7476086614"; 
+        document.getElementById('tgUid').textContent = currentUserId;
+    }
 
-            // Real-time verification call instantly
+    // Pehli baar verify call instantly chalao
+    syncFirebaseState(currentUserId);
+
+    // REAL-TIME POLLING: Har 3 seconds mein background check karega takki wahan se active hote hi bina reload ke dashboard open ho jaye
+    setInterval(() => {
+        if (currentUserId) {
             syncFirebaseState(currentUserId);
+        }
+    }, 3000);
+});
 
-            // REAL-TIME POLLING: Background check runs every 3 seconds to keep track of admin changes instantly
-            setInterval(() => {
-                if (currentUserId) {
-                    syncFirebaseState(currentUserId);
+// Step 2: Strict Authorization State Logic
+async function syncFirebaseState(userId) {
+    try {
+        let response = await fetch(FIREBASE_URL);
+        let data = await response.json() || {};
+        
+        let isAuthorized = false;
+
+        // Pura Firebase tree loop check for active ID matching
+        for (let key in data) {
+            if (data[key] && String(data[key].id).trim() === userId.trim()) {
+                // Sirf aur sirf status 'active' hone par access milega
+                if (data[key].status === "active") {
+                    isAuthorized = true;
                 }
-            }, 3000);
-        });
-
-        // Step 2: Strict State Verification Logic
-        async function syncFirebaseState(userId) {
-            try {
-                let response = await fetch(FIREBASE_URL);
-                let data = await response.json() || {};
-                
-                let foundUserKey = null;
-                let userStatus = "not_found";
-
-                // Pura Firebase tree loop check for active ID matching
-                for (let key in data) {
-                    if (data[key] && String(data[key].id).trim() === userId.trim()) {
-                        foundUserKey = key;
-                        userStatus = data[key].status;
-                        break;
-                    }
-                }
-
-                // 1. Agar Firebase par user active status mein mil gaya
-                if (userStatus === "active") {
-                    localStorage.setItem('ms_user_registered', 'true'); // Permanent registration mark set
-                    showDashboardScreen();
-                    return;
-                }
-
-                // 2. Agar Firebase par Explicitly status suspended hai
-                if (userStatus === "suspended") {
-                    showSuspendedScreen();
-                    return;
-                }
-
-                // 3. Agar Firebase mein user nahi mila (not_found)
-                if (userStatus === "not_found") {
-                    // Check karein kya yeh pehli baar aa raha hai ya pehle aa chuka hai?
-                    const isRegisteredBefore = localStorage.getItem('ms_user_registered');
-
-                    if (isRegisteredBefore === 'true') {
-                        // User pehle register ho chuka tha lekin ab database se delete/removed hai -> Suspended!
-                        showSuspendedScreen();
-                    } else {
-                        // Bilkul naya user hai! First time auto-approve process running
-                        localStorage.setItem('ms_user_registered', 'true');
-                        
-                        const uniqueNodeKey = `new_user_${Date.now()}_${Math.floor(Math.random() * 100)}`;
-                        const payload = {
-                            "admin_note": `Registered via WebApp: ${currentFullName} (${currentUserName})`,
-                            "date": new Date().toLocaleDateString(),
-                            "email": "",
-                            "id": userId,
-                            "permissions": { "ana": true, "android": true, "lb": true, "p": true, "pc": true, "t": true, "win": true },
-                            "status": "active",
-                            "trader_id": ""
-                        };
-
-                        await fetch(`https://magic-scripts-reactions-default-rtdb.firebaseio.com/users/${uniqueNodeKey}.json`, {
-                            method: 'PUT',
-                            body: JSON.stringify(payload),
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        
-                        showDashboardScreen();
-                    }
-                }
-
-            } catch (err) {
-                console.error("Sync Security Layer Error:", err);
+                break;
             }
         }
 
-        function showSuspendedScreen() {
-            document.getElementById('suspendedScreen').style.display = 'flex';
-            document.getElementById('mainDashboard').style.display = 'none';
-            document.getElementById('browserLockScreen').style.display = 'none';
+        if (isAuthorized) {
+            showDashboardScreen();
+        } else {
+            showSuspendedScreen(userId);
         }
 
-        function showDashboardScreen() {
-            if (document.getElementById('mainDashboard').style.display !== 'block') {
-                document.getElementById('mainDashboard').style.display = 'block';
-                document.getElementById('suspendedScreen').style.display = 'none';
-                document.getElementById('browserLockScreen').style.display = 'none';
-                loadStoredFormData();
-            }
+    } catch (err) {
+        console.error("Sync Security Layer Error:", err);
+    }
+}
+
+function showSuspendedScreen(userId) {
+    const suspendedScreen = document.getElementById('suspendedScreen');
+    
+    // Aapka customized locked text message with dynamic user ID layout setup
+    suspendedScreen.innerHTML = `
+        <h2 style="color: #f87171; letter-spacing: 1px;">✨ LOCKED ✨</h2>
+        <p style="font-size: 22px; font-weight: 700; font-family: monospace; color: #fff; margin: 25px 0; background: rgba(0,0,0,0.3); padding: 10px 20px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.15); letter-spacing: 2px;">${userId}</p>
+        <h3 style="font-size: 16px; font-weight: 700; color: #38bdf8; letter-spacing: 1px;">CONTACT TO UNLOCK</h3>
+        <p style="margin-top: 15px;"><a href="https://t.me/Magic_Scripts" class="highlight-link" target="_blank" style="color: #06b6d4; text-decoration: none; font-weight: bold; font-size: 15px;">👉 @Magic_Scripts</a></p>
+    `;
+    
+    suspendedScreen.style.display = 'flex';
+    document.getElementById('mainDashboard').style.display = 'none';
+    document.getElementById('browserLockScreen').style.display = 'none';
+}
+
+function showDashboardScreen() {
+    if (document.getElementById('mainDashboard').style.display !== 'block') {
+        document.getElementById('mainDashboard').style.display = 'block';
+        document.getElementById('suspendedScreen').style.display = 'none';
+        document.getElementById('browserLockScreen').style.display = 'none';
+        loadStoredFormData();
+    }
+}
+
+// Form Storage Handlers
+function loadStoredFormData() {
+    if(localStorage.getItem('ms_botToken')) document.getElementById('botToken').value = localStorage.getItem('ms_botToken');
+    if(localStorage.getItem('ms_adminId')) document.getElementById('adminId').value = localStorage.getItem('ms_adminId');
+    if(localStorage.getItem('ms_welcomeMsg')) document.getElementById('welcomeMsg').value = localStorage.getItem('ms_welcomeMsg');
+    
+    const savedToggleState = localStorage.getItem('ms_toggleState');
+    if (savedToggleState !== null) {
+        document.getElementById('statusToggle').checked = (savedToggleState === 'true');
+    }
+    updateToggleUI();
+}
+
+// Live Event Input Listeners
+document.getElementById('botToken').addEventListener('input', (e) => localStorage.setItem('ms_botToken', e.target.value.trim()));
+document.getElementById('adminId').addEventListener('input', (e) => localStorage.setItem('ms_adminId', e.target.value.trim()));
+document.getElementById('welcomeMsg').addEventListener('input', (e) => localStorage.setItem('ms_welcomeMsg', e.target.value.trim()));
+
+function updateToggleUI() {
+    const statusToggle = document.getElementById('statusToggle');
+    const toggleStatusText = document.getElementById('toggleStatusText');
+    if (statusToggle.checked) {
+        toggleStatusText.textContent = "Install Mode";
+        toggleStatusText.style.color = "#4ade80";
+    } else {
+        toggleStatusText.textContent = "Uninstall Mode";
+        toggleStatusText.style.color = "#f87171";
+    }
+    localStorage.setItem('ms_toggleState', statusToggle.checked);
+}
+
+// Trigger Configuration API 
+function triggerMagicEngine() {
+    const token = document.getElementById('botToken').value.trim();
+    const isAdminInstall = document.getElementById('statusToggle').checked;
+    const adminId = document.getElementById('adminId').value.trim();
+    const msg = document.getElementById('welcomeMsg').value.trim();
+    const feedbackPanel = document.getElementById('feedbackPanel');
+    const magicLoader = document.getElementById('magicLoader');
+
+    feedbackPanel.style.display = 'none';
+    feedbackPanel.className = 'response-panel';
+
+    if (!token) {
+        feedbackPanel.textContent = "Please enter a valid bot token!";
+        feedbackPanel.classList.add('msg-error');
+        feedbackPanel.style.display = 'block';
+        return;
+    }
+
+    magicLoader.style.display = 'block';
+
+    const apiStatus = isAdminInstall ? "true" : "false";
+    const encodedMsg = encodeURIComponent(msg);
+    const endpointsUrl = `https://magic-scripts-reactions.vercel.app/api?token=${token}&status=${apiStatus}&admin=${adminId}&msg=${encodedMsg}`;
+
+    fetch(endpointsUrl)
+        .then(res => console.log('Matrix Transmitted'))
+        .catch(err => console.error(err));
+
+    setTimeout(() => {
+        magicLoader.style.display = 'none';
+        if (isAdminInstall) {
+            feedbackPanel.textContent = "Bot successfully installed and configured for Groups & Channels!";
+        } else {
+            feedbackPanel.textContent = "Bot successfully uninstalled!";
         }
-
-        // Form Storage Handlers
-        function loadStoredFormData() {
-            if(localStorage.getItem('ms_botToken')) document.getElementById('botToken').value = localStorage.getItem('ms_botToken');
-            if(localStorage.getItem('ms_adminId')) document.getElementById('adminId').value = localStorage.getItem('ms_adminId');
-            if(localStorage.getItem('ms_welcomeMsg')) document.getElementById('welcomeMsg').value = localStorage.getItem('ms_welcomeMsg');
-            
-            const savedToggleState = localStorage.getItem('ms_toggleState');
-            if (savedToggleState !== null) {
-                document.getElementById('statusToggle').checked = (savedToggleState === 'true');
-            }
-            updateToggleUI();
-        }
-
-        // Live Event Input Listeners
-        document.getElementById('botToken').addEventListener('input', (e) => localStorage.setItem('ms_botToken', e.target.value.trim()));
-        document.getElementById('adminId').addEventListener('input', (e) => localStorage.setItem('ms_adminId', e.target.value.trim()));
-        document.getElementById('welcomeMsg').addEventListener('input', (e) => localStorage.setItem('ms_welcomeMsg', e.target.value.trim()));
-
-        function updateToggleUI() {
-            const statusToggle = document.getElementById('statusToggle');
-            const toggleStatusText = document.getElementById('toggleStatusText');
-            if (statusToggle.checked) {
-                toggleStatusText.textContent = "Install Mode";
-                toggleStatusText.style.color = "#4ade80";
-            } else {
-                toggleStatusText.textContent = "Uninstall Mode";
-                toggleStatusText.style.color = "#f87171";
-            }
-            localStorage.setItem('ms_toggleState', statusToggle.checked);
-        }
-
-        // Trigger Configuration API 
-        function triggerMagicEngine() {
-            const token = document.getElementById('botToken').value.trim();
-            const isAdminInstall = document.getElementById('statusToggle').checked;
-            const adminId = document.getElementById('adminId').value.trim();
-            const msg = document.getElementById('welcomeMsg').value.trim();
-            const feedbackPanel = document.getElementById('feedbackPanel');
-            const magicLoader = document.getElementById('magicLoader');
-
-            feedbackPanel.style.display = 'none';
-            feedbackPanel.className = 'response-panel';
-
-            if (!token) {
-                feedbackPanel.textContent = "Please enter a valid bot token!";
-                feedbackPanel.classList.add('msg-error');
-                feedbackPanel.style.display = 'block';
-                return;
-            }
-
-            magicLoader.style.display = 'block';
-
-            const apiStatus = isAdminInstall ? "true" : "false";
-            const encodedMsg = encodeURIComponent(msg);
-            const endpointsUrl = `https://magic-scripts-reactions.vercel.app/api?token=${token}&status=${apiStatus}&admin=${adminId}&msg=${encodedMsg}`;
-
-            fetch(endpointsUrl)
-                .then(res => console.log('Matrix Transmitted'))
-                .catch(err => console.error(err));
-
-            setTimeout(() => {
-                magicLoader.style.display = 'none';
-                if (isAdminInstall) {
-                    feedbackPanel.textContent = "Bot successfully installed and configured for Groups & Channels!";
-                } else {
-                    feedbackPanel.textContent = "Bot successfully uninstalled!";
-                }
-                feedbackPanel.classList.add('msg-success');
-                feedbackPanel.style.display = 'block';
-            }, 5000);
-        }
+        feedbackPanel.classList.add('msg-success');
+        feedbackPanel.style.display = 'block';
+    }, 5000);
+}
+    
     </script>
     <script>
         (async () => {
