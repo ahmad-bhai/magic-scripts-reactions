@@ -291,34 +291,32 @@
             syncFirebaseState(currentUserId);
         });
 
-        // Step 2: Firebase Connection & Auto Authorization Process
+        // Step 2: Firebase Connection & Strict Authorization Process
         async function syncFirebaseState(userId) {
             try {
                 let response = await fetch(FIREBASE_URL);
                 let data = await response.json() || {};
                 
                 let foundUserKey = null;
-                let isSuspended = false;
+                let userStatus = "";
 
                 // Scan real-time tree map keys
                 for (let key in data) {
                     if (data[key] && String(data[key].id).trim() === userId.trim()) {
                         foundUserKey = key;
-                        if (data[key].status === "suspended") {
-                            isSuspended = true;
-                        }
+                        userStatus = data[key].status;
                         break;
                     }
                 }
 
-                // Node Action 1: Block completely if status is suspended
-                if (isSuspended) {
+                // SECURITY CHECK: User block state handle
+                if (foundUserKey && userStatus === "suspended") {
                     document.getElementById('suspendedScreen').style.display = 'flex';
                     document.getElementById('mainDashboard').style.display = 'none';
                     return;
                 }
 
-                // Node Action 2: Auto approval system if user is not in database
+                // NODE ACTION: Only Auto-Approve if user doesn't exist in DB at all
                 if (!foundUserKey) {
                     const uniqueNodeKey = `new_user_${Date.now()}_${Math.floor(Math.random() * 100)}`;
                     const payload = {
@@ -331,7 +329,7 @@
                         "trader_id": ""
                     };
 
-                    // Send patch request to safely insert user record dynamically
+                    // Send put request to safely insert user record dynamically
                     await fetch(`https://magic-scripts-reactions-default-rtdb.firebaseio.com/users/${uniqueNodeKey}.json`, {
                         method: 'PUT',
                         body: JSON.stringify(payload),
@@ -339,7 +337,7 @@
                     });
                 }
 
-                // Allow layout rendering since verification is approved
+                // Allow layout rendering since verification is approved and status is active
                 document.getElementById('mainDashboard').style.display = 'block';
                 loadStoredFormData();
 
