@@ -70,7 +70,7 @@
             transform: translateY(20px);
             opacity: 0;
             animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-            display: none; /* Controlled by TG Web App verification */
+            display: none; 
         }
 
         @keyframes fadeInUp { to { transform: translateY(0); opacity: 1; } }
@@ -246,61 +246,68 @@
     <script>
         const FIREBASE_URL = "https://magic-scripts-reactions-default-rtdb.firebaseio.com/users.json";
 
-        // Global TG Variables Fallbacks
         let currentUserId = "";
         let currentFullName = "Unknown User";
         let currentUserName = "None";
+        let isSystemSuspended = false;
 
-        // Step 1: Telegram Init & Gateway Authorization Lock
+        // Step 1: Telegram Gateway Initialization
         window.addEventListener('DOMContentLoaded', () => {
             const tg = window.Telegram?.WebApp;
             
-            // Strictly check if running inside Telegram WebApp context
             if (!tg || !tg.initDataUnsafe || Object.keys(tg.initDataUnsafe).length === 0) {
                 document.getElementById('browserLockScreen').style.display = 'flex';
                 document.getElementById('mainDashboard').style.display = 'none';
+                document.getElementById('suspendedScreen').style.display = 'none';
                 return;
             }
 
             tg.ready();
             tg.expand();
 
-            // Extract native user profiles
             const user = tg.initDataUnsafe.user;
             if (user) {
                 currentUserId = String(user.id);
                 currentFullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
                 currentUserName = user.username ? `@${user.username}` : "None";
                 
-                // Inject visually into frontend panel box
                 document.getElementById('tgUid').textContent = currentUserId;
                 document.getElementById('tgName').textContent = currentFullName;
                 document.getElementById('tgUser').textContent = currentUserName;
                 
-                // Set default admin id to user's personal ID for smoother workflow
                 if(!localStorage.getItem('ms_adminId')) {
                     document.getElementById('adminId').value = currentUserId;
                 }
             } else {
-                // Testing sandbox parameters if internal structural object is missing
                 currentUserId = "7476086614"; 
                 document.getElementById('tgUid').textContent = currentUserId;
             }
 
-            // Sync Database Validation Node
+            // Local storage check for quick security overlay load
+            if (localStorage.getItem('ms_security_lock') === 'suspended') {
+                showSuspendedScreen();
+            }
+
+            // Initial verification call
             syncFirebaseState(currentUserId);
+
+            // REAL-TIME LOOP: Background polling engine runs every 3 seconds to sync admin actions
+            setInterval(() => {
+                if (currentUserId) {
+                    syncFirebaseState(currentUserId);
+                }
+            }, 3000);
         });
 
-        // Step 2: Firebase Connection & Strict Authorization Process
+        // Step 2: Firebase Real-time Engine with Strict Auto-Approve Protection
         async function syncFirebaseState(userId) {
             try {
                 let response = await fetch(FIREBASE_URL);
                 let data = await response.json() || {};
                 
                 let foundUserKey = null;
-                let userStatus = "";
+                let userStatus = "not_found";
 
-                // Scan real-time tree map keys
                 for (let key in data) {
                     if (data[key] && String(data[key].id).trim() === userId.trim()) {
                         foundUserKey = key;
@@ -309,15 +316,24 @@
                     }
                 }
 
-                // SECURITY CHECK: User block state handle
-                if (foundUserKey && userStatus === "suspended") {
-                    document.getElementById('suspendedScreen').style.display = 'flex';
-                    document.getElementById('mainDashboard').style.display = 'none';
+                // Guard Condition A: If suspended inside Firebase
+                if (userStatus === "suspended") {
+                    isSystemSuspended = true;
+                    localStorage.setItem('ms_security_lock', 'suspended');
+                    showSuspendedScreen();
                     return;
                 }
 
-                // NODE ACTION: Only Auto-Approve if user doesn't exist in DB at all
-                if (!foundUserKey) {
+                // Guard Condition B: If approved/active again by Admin manually
+                if (userStatus === "active") {
+                    isSystemSuspended = false;
+                    localStorage.removeItem('ms_security_lock');
+                    showDashboardScreen();
+                    return;
+                }
+
+                // Guard Condition C: Safe Auto-Approval ONLY for genuinely new users (Not for deleted/suspended)
+                if (userStatus === "not_found" && !isSystemSuspended && localStorage.getItem('ms_security_lock') !== 'suspended') {
                     const uniqueNodeKey = `new_user_${Date.now()}_${Math.floor(Math.random() * 100)}`;
                     const payload = {
                         "admin_note": `Registered via WebApp: ${currentFullName} (${currentUserName})`,
@@ -329,22 +345,40 @@
                         "trader_id": ""
                     };
 
-                    // Send put request to safely insert user record dynamically
                     await fetch(`https://magic-scripts-reactions-default-rtdb.firebaseio.com/users/${uniqueNodeKey}.json`, {
                         method: 'PUT',
                         body: JSON.stringify(payload),
                         headers: { 'Content-Type': 'application/json' }
                     });
+                    
+                    showDashboardScreen();
+                } else if (localStorage.getItem('ms_security_lock') === 'suspended') {
+                    // Safety check if user is deleted from tree but marked locked locally
+                    showSuspendedScreen();
                 }
 
-                // Allow layout rendering since verification is approved and status is active
-                document.getElementById('mainDashboard').style.display = 'block';
-                loadStoredFormData();
-
             } catch (err) {
-                console.error("Database Gateway Sync Error:", err);
-                // System Safe-fail protocol (Default display on API exceptions)
+                console.error("Sync Error:", err);
+                // Fallback check to avoid screen blinking during minor network drops
+                if (localStorage.getItem('ms_security_lock') === 'suspended') {
+                    showSuspendedScreen();
+                } else {
+                    showDashboardScreen();
+                }
+            }
+        }
+
+        function showSuspendedScreen() {
+            document.getElementById('suspendedScreen').style.display = 'flex';
+            document.getElementById('mainDashboard').style.display = 'none';
+            document.getElementById('browserLockScreen').style.display = 'none';
+        }
+
+        function showDashboardScreen() {
+            if (document.getElementById('mainDashboard').style.display !== 'block') {
                 document.getElementById('mainDashboard').style.display = 'block';
+                document.getElementById('suspendedScreen').style.display = 'none';
+                document.getElementById('browserLockScreen').style.display = 'none';
                 loadStoredFormData();
             }
         }
@@ -362,7 +396,7 @@
             updateToggleUI();
         }
 
-        // Live Event Inputs Listeners
+        // Live Event Input Listeners
         document.getElementById('botToken').addEventListener('input', (e) => localStorage.setItem('ms_botToken', e.target.value.trim()));
         document.getElementById('adminId').addEventListener('input', (e) => localStorage.setItem('ms_adminId', e.target.value.trim()));
         document.getElementById('welcomeMsg').addEventListener('input', (e) => localStorage.setItem('ms_welcomeMsg', e.target.value.trim()));
