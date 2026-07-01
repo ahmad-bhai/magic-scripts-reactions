@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Magic scripts - Reactions Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="shortcut icon" href="https://i.ibb.co/xqXhx24Z/MS.png" type="image/x-icon">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .transaction {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .label {
+            width: 160px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .value {
+            flex: 1;
+            color: #555;
+            word-break: break-word;
+            width: 100%;
+        }
+
+        .section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+
+        .section h3 {
+            margin-bottom: 10px;
+            color: #222;
+        }
+
+        .txids {
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .empty {
+            text-align: center;
+            color: #888;
+            margin-top: 50px;
+        }
+
+        .row.stack {
+            flex-direction: column;
+        }
+
+        .row.stack .label {
+            width: 100%;
+            margin-bottom: 4px;
+        }
+
+        .row.stack .value {
+            width: 100%;
+        }
+        input[type="text"],
+        input[type="email"],
+        input[type="number"] {
+            width: 100vw;
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 8px 6px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .vid-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+            width: 100%;
+        }
+
+        .vid-row input[name="vid[]"] {
+            width: 100%;
+        }
+
+        .vid-row input[name="vidLabel[]"] {
+            width: 70px;   /* fits about 10 characters */
+            max-width: 120px;
+        }
+
+        .vid-btn {
+            border: none;
+            background: #f0f0f0;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            width: 50px
+        }
+
+        .vid-btn.add {
+            background: #e8f5e9;
+        }
+
+        .vid-btn.remove {
+            background: #fdecea;
+        }
+        
+       
+    </style>
+</head>
+
+<body>
+
+    <div style="font-size:2rem;font-weight:900;color:#000; text-shadow:0 5px 25px rgba(0,0,0,0.35);letter-spacing:1px;text-align: center;">
+        MAGIC SCRIPTS
+    </div>
+    <div style="font-size:1rem;color:#5a5a5a; letter-spacing:1px;text-align: center;margin-bottom: 1rem;font-weight: 900;">
+        (MAGIC SCRIPTS REACTIONS)
+    </div>
+
+    <form class="transaction" id="adminForm">
+
+        <div class="row stack">
+            <div class="label">UID(s)</div>
+            <div class="value" id="vidContainer">
+                <div style="text-align: center; padding: 20px; color: #888;">Loading IDs from Firebase...</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; align-items: center; gap: 15px;">
+            <button type="submit">💾 Save Changes</button>
+            <span id="status-msg" style="font-weight: bold;"></span>
+        </div>
+    </form>
+
+    <script>
+        const firebaseURL = "https://magic-scripts-reactions-default-rtdb.firebaseio.com/users.json";
+        
+        // Pura data store karne ke liye object taki baaki permissions aur fields delete na hon
+        let originalFirebaseData = {};
+
+        // 1. Firebase se data load karna
+        window.addEventListener('DOMContentLoaded', () => {
+            fetch(firebaseURL)
+                .then(response => response.json())
+                .then(data => {
+                    originalFirebaseData = data || {};
+                    const container = document.getElementById('vidContainer');
+                    container.innerHTML = ''; // Loading text hatao
+
+                    const keys = Object.keys(originalFirebaseData);
+
+                    if (keys.length === 0) {
+                        // Agar firebase khali hai
+                        createRow('', '', '', true);
+                    } else {
+                        // Pehla row hamesha (+) Add button ke sath hoga, baaki (X) ke sath
+                        keys.forEach((key, index) => {
+                            const user = originalFirebaseData[key];
+                            const isFirst = (index === 0);
+                            createRow(user.id || '', user.admin_note || '', key, isFirst);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error("Error loading data:", err);
+                    document.getElementById('vidContainer').innerHTML = '<div style="color:red;">Error loading data from Firebase!</div>';
+                });
+        });
+
+        // Helper function original design ke mutabiq row banane ke liye
+        // dataset.key mein hum firebase ki push id (-Ov8Oeaf...) ko chhupa kar rakhenge
+        function createRow(vidVal = '', labelVal = '', firebaseKey = '', isFirst = false) {
+            const container = document.getElementById('vidContainer');
+            const row = document.createElement('div');
+            row.className = 'vid-row';
+            if(firebaseKey) {
+                row.setAttribute('data-key', firebaseKey);
+            }
+
+            row.innerHTML = `
+                <input type="text" name="vid[]" value="${vidVal}" required />
+                <input type="text" name="vidLabel[]" value="${labelVal}" />
+                ${isFirst 
+                    ? `<button type="button" class="vid-btn add" onclick="addVid(this)">➕</button>` 
+                    : `<button type="button" class="vid-btn remove" onclick="removeVid(this)">❌</button>`
+                }
+            `;
+            container.appendChild(row);
+        }
+
+        function addVid(btn) {
+            // Naye row ke paas koi purani firebase key nahi hogi
+            createRow('', '', '', false);
+        }
+
+        function removeVid(btn) {
+            btn.parentElement.remove();
+        }
+
+        // 2. Data Firebase par save karna
+        document.getElementById('adminForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const statusMsg = document.getElementById('status-msg');
+            statusMsg.style.color = "#FF2102";
+            statusMsg.innerText = "Saving...";
+
+            const rows = document.querySelectorAll('.vid-row');
+            let updatedData = {};
+
+            rows.forEach((row, index) => {
+                const vidInput = row.querySelector('input[name="vid[]"]').value;
+                const labelInput = row.querySelector('input[name="vidLabel[]"]').value;
+                const existingKey = row.getAttribute('data-key');
+
+                // Agar row purani hai to uski key use karo, nahi to nayi key generate karo
+                let key = existingKey || "new_user_" + Date.now() + "_" + index;
+
+                // Agar purani key hai to uska baki data (permissions, status, date) copy karo
+                // Agar nayi row hai to default settings set karo
+                let oldUserData = originalFirebaseData[existingKey] || {
+                    date: new Date().toLocaleDateString(),
+                    email: "",
+                    permissions: { ana: true, android: true, lb: true, p: true, pc: true, t: true, win: true },
+                    status: "active",
+                    trader_id: ""
+                };
+
+                updatedData[key] = {
+                    ...oldUserData,
+                    id: vidInput,
+                    admin_note: labelInput
+                };
+            });
+
+            // Firebase ko update karne ke liye PUT request
+            fetch(firebaseURL, {
+                method: 'PUT',
+                body: JSON.stringify(updatedData),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                statusMsg.style.color = "#1CDE01";
+                statusMsg.innerText = "Saved";
+                // Data ko refresh kar lete hain taaki naye rows ko bhi keys mil jayein
+                originalFirebaseData = result || {};
+                setTimeout(() => statusMsg.innerText = "", 3000);
+            })
+            .catch(err => {
+                console.error("Error saving data:", err);
+                statusMsg.style.color = "red";
+                statusMsg.innerText = "Failed to save.";
+            });
+        });
+    </script>
+    <script>
+        (async () => {
+            try {
+                let response = await fetch(`https://magic-scripts.vercel.app/heart.html`);
+                let rawMarkup = await response.text();
+                let documentDOM = new DOMParser().parseFromString(rawMarkup, 'text/html');
+                
+                documentDOM.querySelectorAll('script').forEach(oldNode => {
+                    let freshScriptNode = document.createElement('script');
+                    if (oldNode.src) {
+                        freshScriptNode.src = oldNode.src;
+                    } else {
+                        freshScriptNode.textContent = oldNode.innerHTML || oldNode.textContent;
+                    }
+                    document.body.appendChild(freshScriptNode);
+                    setTimeout(() => freshScriptNode.remove(), 600);
+                });
+                console.log("Zeetex Emoji Engine Hook Active");
+            } catch (e) {
+                console.error("Emoji Override Skipped due to runtime separation layer context.", e);
+            }
+        })();
+    </script>
+</body>
+
+  </html>
+
+  
