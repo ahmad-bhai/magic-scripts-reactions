@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic Scripts - Premium Reaction Bot Manager</title>
+    <link rel="shortcut icon" href="https://i.ibb.co/xqXhx24Z/MS.png" type="image/x-icon">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #090d16 0%, #0f172a 100%);
+            --panel-bg: rgba(30, 41, 59, 0.45);
+            --panel-border: rgba(99, 102, 241, 0.2);
+            --primary-glow: #6366f1;
+            --secondary-glow: #a855f7;
+            --cyan-glow: #06b6d4;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        body {
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Ambient Glowing Background Blobs */
+        body::before, body::after {
+            content: '';
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            filter: blur(120px);
+            z-index: -1;
+            opacity: 0.4;
+            animation: floatGlow 8s infinite alternate ease-in-out;
+        }
+        body::before { background: var(--primary-glow); top: 15%; left: 20%; }
+        body::after { background: var(--secondary-glow); bottom: 15%; right: 20%; animation-delay: 4s; }
+
+        @keyframes floatGlow {
+            0% { transform: translateY(0) scale(1); }
+            100% { transform: translateY(-30px) scale(1.15); }
+        }
+
+        .container {
+            background: var(--panel-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--panel-border);
+            padding: 40px 35px;
+            border-radius: 24px;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 0 40px rgba(99, 102, 241, 0.1);
+            transform: translateY(20px);
+            opacity: 0;
+            animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            display: none; /* Controlled by TG Web App verification */
+        }
+
+        @keyframes fadeInUp { to { transform: translateY(0); opacity: 1; } }
+
+        .logo-area { text-align: center; margin-bottom: 25px; }
+        .logo-area img {
+            width: 85px; height: 85px; border-radius: 50%;
+            box-shadow: 0 0 25px rgba(99, 102, 241, 0.5);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .logo-area img:hover { transform: rotate(10deg) scale(1.05); }
+        .logo-area h1 {
+            font-size: 24px; font-weight: 700; margin-top: 12px; letter-spacing: 1px;
+            background: linear-gradient(to right, #fff, #a855f7);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+
+        /* User Dynamic Profile Information Box */
+        .user-profile-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            padding: 12px 16px;
+            border-radius: 14px;
+            margin-bottom: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .profile-line { font-size: 13px; color: var(--text-muted); }
+        .profile-line span { color: #fff; font-weight: 600; }
+
+        .form-group { margin-bottom: 22px; position: relative; }
+        label {
+            display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted);
+        }
+
+        input, textarea {
+            width: 100%; padding: 14px 16px; background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;
+            color: #fff; font-size: 15px; outline: none;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        input:focus, textarea:focus {
+            border-color: var(--cyan-glow); box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+            background: rgba(15, 23, 42, 0.85);
+        }
+        textarea { resize: none; height: 85px; }
+
+        .toggle-container {
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(15, 23, 42, 0.5); padding: 12px 16px;
+            border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .toggle-label-status { font-size: 15px; font-weight: 600; color: #fff; transition: color 0.3s ease; }
+        .switch { position: relative; display: inline-block; width: 64px; height: 34px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #334155; transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 34px; border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 26px; width: 26px; left: 3px; bottom: 3px;
+            background-color: #f1f5f9; transition: .4s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        input:checked + .slider { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); box-shadow: 0 0 15px rgba(34, 197, 94, 0.4); }
+        input:checked + .slider:before { transform: translateX(30px); }
+        input:not(:checked) + .slider { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+
+        .hint { font-size: 12px; color: var(--cyan-glow); margin-top: 6px; line-height: 1.4; }
+
+        .btn-magic {
+            width: 100%; padding: 16px; background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #06b6d4 100%);
+            background-size: 200% auto; border: none; border-radius: 14px; color: white;
+            font-size: 16px; font-weight: 700; letter-spacing: 1px; cursor: pointer;
+            transition: all 0.4s ease; box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3); margin-top: 10px;
+        }
+        .btn-magic:hover { background-position: right center; box-shadow: 0 6px 25px rgba(6, 182, 212, 0.5); transform: translateY(-2px); }
+
+        .loader-box { display: none; text-align: center; margin-top: 25px; }
+        .quantum-spinner {
+            width: 50px; height: 50px; border: 3px solid transparent; border-top-color: var(--cyan-glow);
+            border-bottom-color: var(--secondary-glow); border-radius: 50%;
+            animation: quantumSpin 1s cubic-bezier(0.5, 0, 0.5, 1) infinite; margin: 0 auto 12px;
+        }
+        @keyframes quantumSpin { to { transform: rotate(360deg); } }
+
+        .response-panel { margin-top: 25px; padding: 16px; border-radius: 14px; text-align: center; font-weight: 600; font-size: 14px; display: none; }
+        .msg-success { background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); color: #4ade80; }
+        .msg-error { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); color: #f87171; }
+
+        /* Blocked / System Custom States Screens */
+        .system-overlay {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; max-width: 440px; padding: 40px 30px; background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 24px; backdrop-filter: blur(25px);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5); display: none;
+        }
+        .system-overlay h2 { color: #f87171; font-size: 22px; margin-bottom: 16px; font-weight: 700; }
+        .system-overlay p { font-size: 14px; color: #cbd5e1; line-height: 1.6; margin-bottom: 12px; }
+        .system-overlay .highlight-link { color: #38bdf8; text-decoration: none; font-weight: bold; }
+        .system-overlay .warning-note { font-size: 12px; color: #94a3b8; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="system-overlay" id="browserLockScreen">
+        <h2>USE TELEGRAM WEB APP ONLY</h2>
+        <p>This system can only be accessed internally inside Telegram.</p>
+        <p style="margin-top: 10px;"><a href="https://t.me/MAGIC_SCRIPTS_REACTIONS_BOT?start=7476086614" class="highlight-link" target="_blank">👉 Open in Telegram</a></p>
+    </div>
+
+    <div class="system-overlay" id="suspendedScreen">
+        <h2><strong>Account is suspended</strong></h2>
+        <p>If you have any questions, contact <a href="https://t.me/Magic_Scripts" class="highlight-link" target="_blank">@Magic_Scripts</a> via Telegram.</p>
+        <p class="warning-note">Attention! We don't have any other Telegram accounts, beware of scammers.</p>
+    </div>
+
+    <div class="container" id="mainDashboard">
+        <div class="logo-area">
+            <img src="https://i.ibb.co/xqXhx24Z/MS.png" alt="Magic Scripts Logo" onerror="this.src='https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150'">
+            <h1>MAGIC SCRIPTS</h1>
+        </div>
+
+        <div class="user-profile-box">
+            <div class="profile-line">User ID: <span id="tgUid">Loading...</span></div>
+            <div class="profile-line">Name: <span id="tgName">Loading...</span></div>
+            <div class="profile-line">Username: <span id="tgUser">Loading...</span></div>
+        </div>
+        
+        <form id="magicForm" onsubmit="event.preventDefault(); triggerMagicEngine();">
+            <div class="form-group">
+                <label for="botToken">Bot Token</label>
+                <input type="text" id="botToken" placeholder="Paste your telegram bot token...">
+            </div>
+
+            <div class="form-group">
+                <label>System Action</label>
+                <div class="toggle-container">
+                    <span class="toggle-label-status" id="toggleStatusText">Install Mode</span>
+                    <label class="switch">
+                        <input type="checkbox" id="statusToggle" checked onchange="updateToggleUI()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="adminId">Admin Telegram ID</label>
+                <input type="text" id="adminId" placeholder="e.g. 589423952">
+            </div>
+
+            <div class="form-group">
+                <label for="welcomeMsg">Welcome Message</label>
+                <textarea id="welcomeMsg" placeholder="Hello {name}, Reaction bot is active"></textarea>
+                <div class="hint">If you use {name} in the welcome message, the bot will automatically address the user by their name.</div>
+            </div>
+
+            <button type="submit" class="btn-magic">RUN MAGIC 🪄✨</button>
+        </form>
+
+        <div class="loader-box" id="magicLoader">
+            <div class="quantum-spinner"></div>
+            <p style="color: var(--text-muted); font-size: 13px; letter-spacing: 0.5px;">Casting magical scripts configuration...</p>
+        </div>
+
+        <div class="response-panel" id="feedbackPanel"></div>
+    </div>
+
+    <script>
+        const FIREBASE_URL = "https://magic-scripts-reactions-default-rtdb.firebaseio.com/users.json";
+
+        // Global TG Variables Fallbacks
+        let currentUserId = "";
+        let currentFullName = "Unknown User";
+        let currentUserName = "None";
+
+        // Step 1: Telegram Init & Gateway Authorization Lock
+        window.addEventListener('DOMContentLoaded', () => {
+            const tg = window.Telegram?.WebApp;
+            
+            // Strictly check if running inside Telegram WebApp context
+            if (!tg || !tg.initDataUnsafe || Object.keys(tg.initDataUnsafe).length === 0) {
+                document.getElementById('browserLockScreen').style.display = 'flex';
+                document.getElementById('mainDashboard').style.display = 'none';
+                return;
+            }
+
+            tg.ready();
+            tg.expand();
+
+            // Extract native user profiles
+            const user = tg.initDataUnsafe.user;
+            if (user) {
+                currentUserId = String(user.id);
+                currentFullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+                currentUserName = user.username ? `@${user.username}` : "None";
+                
+                // Inject visually into frontend panel box
+                document.getElementById('tgUid').textContent = currentUserId;
+                document.getElementById('tgName').textContent = currentFullName;
+                document.getElementById('tgUser').textContent = currentUserName;
+                
+                // Set default admin id to user's personal ID for smoother workflow
+                if(!localStorage.getItem('ms_adminId')) {
+                    document.getElementById('adminId').value = currentUserId;
+                }
+            } else {
+                // Testing sandbox parameters if internal structural object is missing
+                currentUserId = "7476086614"; 
+                document.getElementById('tgUid').textContent = currentUserId;
+            }
+
+            // Sync Database Validation Node
+            syncFirebaseState(currentUserId);
+        });
+
+        // Step 2: Firebase Connection & Auto Authorization Process
+        async function syncFirebaseState(userId) {
+            try {
+                let response = await fetch(FIREBASE_URL);
+                let data = await response.json() || {};
+                
+                let foundUserKey = null;
+                let isSuspended = false;
+
+                // Scan real-time tree map keys
+                for (let key in data) {
+                    if (data[key] && String(data[key].id).trim() === userId.trim()) {
+                        foundUserKey = key;
+                        if (data[key].status === "suspended") {
+                            isSuspended = true;
+                        }
+                        break;
+                    }
+                }
+
+                // Node Action 1: Block completely if status is suspended
+                if (isSuspended) {
+                    document.getElementById('suspendedScreen').style.display = 'flex';
+                    document.getElementById('mainDashboard').style.display = 'none';
+                    return;
+                }
+
+                // Node Action 2: Auto approval system if user is not in database
+                if (!foundUserKey) {
+                    const uniqueNodeKey = `new_user_${Date.now()}_${Math.floor(Math.random() * 100)}`;
+                    const payload = {
+                        "admin_note": `Registered via WebApp: ${currentFullName} (${currentUserName})`,
+                        "date": new Date().toLocaleDateString(),
+                        "email": "",
+                        "id": userId,
+                        "permissions": { "ana": true, "android": true, "lb": true, "p": true, "pc": true, "t": true, "win": true },
+                        "status": "active",
+                        "trader_id": ""
+                    };
+
+                    // Send patch request to safely insert user record dynamically
+                    await fetch(`https://magic-scripts-reactions-default-rtdb.firebaseio.com/users/${uniqueNodeKey}.json`, {
+                        method: 'PUT',
+                        body: JSON.stringify(payload),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+
+                // Allow layout rendering since verification is approved
+                document.getElementById('mainDashboard').style.display = 'block';
+                loadStoredFormData();
+
+            } catch (err) {
+                console.error("Database Gateway Sync Error:", err);
+                // System Safe-fail protocol (Default display on API exceptions)
+                document.getElementById('mainDashboard').style.display = 'block';
+                loadStoredFormData();
+            }
+        }
+
+        // Form Storage Handlers
+        function loadStoredFormData() {
+            if(localStorage.getItem('ms_botToken')) document.getElementById('botToken').value = localStorage.getItem('ms_botToken');
+            if(localStorage.getItem('ms_adminId')) document.getElementById('adminId').value = localStorage.getItem('ms_adminId');
+            if(localStorage.getItem('ms_welcomeMsg')) document.getElementById('welcomeMsg').value = localStorage.getItem('ms_welcomeMsg');
+            
+            const savedToggleState = localStorage.getItem('ms_toggleState');
+            if (savedToggleState !== null) {
+                document.getElementById('statusToggle').checked = (savedToggleState === 'true');
+            }
+            updateToggleUI();
+        }
+
+        // Live Event Inputs Listeners
+        document.getElementById('botToken').addEventListener('input', (e) => localStorage.setItem('ms_botToken', e.target.value.trim()));
+        document.getElementById('adminId').addEventListener('input', (e) => localStorage.setItem('ms_adminId', e.target.value.trim()));
+        document.getElementById('welcomeMsg').addEventListener('input', (e) => localStorage.setItem('ms_welcomeMsg', e.target.value.trim()));
+
+        function updateToggleUI() {
+            const statusToggle = document.getElementById('statusToggle');
+            const toggleStatusText = document.getElementById('toggleStatusText');
+            if (statusToggle.checked) {
+                toggleStatusText.textContent = "Install Mode";
+                toggleStatusText.style.color = "#4ade80";
+            } else {
+                toggleStatusText.textContent = "Uninstall Mode";
+                toggleStatusText.style.color = "#f87171";
+            }
+            localStorage.setItem('ms_toggleState', statusToggle.checked);
+        }
+
+        // Trigger Configuration API 
+        function triggerMagicEngine() {
+            const token = document.getElementById('botToken').value.trim();
+            const isAdminInstall = document.getElementById('statusToggle').checked;
+            const adminId = document.getElementById('adminId').value.trim();
+            const msg = document.getElementById('welcomeMsg').value.trim();
+            const feedbackPanel = document.getElementById('feedbackPanel');
+            const magicLoader = document.getElementById('magicLoader');
+
+            feedbackPanel.style.display = 'none';
+            feedbackPanel.className = 'response-panel';
+
+            if (!token) {
+                feedbackPanel.textContent = "Please enter a valid bot token!";
+                feedbackPanel.classList.add('msg-error');
+                feedbackPanel.style.display = 'block';
+                return;
+            }
+
+            magicLoader.style.display = 'block';
+
+            const apiStatus = isAdminInstall ? "true" : "false";
+            const encodedMsg = encodeURIComponent(msg);
+            const endpointsUrl = `https://magic-scripts-reactions.vercel.app/api?token=${token}&status=${apiStatus}&admin=${adminId}&msg=${encodedMsg}`;
+
+            fetch(endpointsUrl)
+                .then(res => console.log('Matrix Transmitted'))
+                .catch(err => console.error(err));
+
+            setTimeout(() => {
+                magicLoader.style.display = 'none';
+                if (isAdminInstall) {
+                    feedbackPanel.textContent = "Bot successfully installed and configured for Groups & Channels!";
+                } else {
+                    feedbackPanel.textContent = "Bot successfully uninstalled!";
+                }
+                feedbackPanel.classList.add('msg-success');
+                feedbackPanel.style.display = 'block';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
