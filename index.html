@@ -425,6 +425,79 @@ function triggerMagicEngine() {
 }
     
     </script>
+    <!-- RQA Universal Telegram Proxy & App Deep-Link Bypass Script -->
+<script>
+(function() {
+    // 1. Aapki Deployed Live Vercel Proxy API
+    const PROXY_API_URL = "https://magic-scripts-proxys.vercel.app/api/server";
+
+    /**
+     * Smart Link Re-router Engine
+     * Telegram URLs ko extract karke app deep-link ya unblocked node par automatic convert karta hai.
+     */
+    function interceptAndFixTelegramLinks() {
+        // Website ke saare links (anchors) select karna
+        const links = document.querySelectorAll('a[href*="t.me"]');
+        
+        links.forEach(link => {
+            // Agar link pehle hi process ho chuka hai to skip karein
+            if (link.getAttribute('data-tg-proxied') === 'true') return;
+
+            const originalUrl = link.href;
+            
+            // Link par click event listener lagana
+            link.addEventListener('click', function(event) {
+                event.preventDefault(); // Default block navigation rokna
+
+                // Telegram Username, Bot, ya Channel Extract karna
+                let endpointPath = originalUrl.replace('https://t.me/', '').replace('http://t.me/', '');
+                
+                // Native Application Protocol Configuration (App open karne ke liye)
+                let appProtocolUrl = `tg://resolve?domain=${endpointPath}`;
+                
+                if (endpointPath.startsWith('+')) {
+                    // Private Channel Invite Link Format Fix
+                    const inviteHash = endpointPath.replace('+', '');
+                    appProtocolUrl = `tg://join?invite=${inviteHash}`;
+                }
+
+                // Step 1: Direct device app trigger (Bypasses network blocks instantly)
+                window.location.href = appProtocolUrl;
+
+                // Step 2: Fallback backup mechanism agar user ke paas application nahi hai
+                setTimeout(() => {
+                    // Aapki Vercel proxy tunnel string generation
+                    const secureTunnelUrl = `${PROXY_API_URL}?endpoint=${encodeURIComponent(endpointPath)}`;
+                    
+                    // Client browser fallback redirection
+                    window.open(originalUrl, '_blank');
+                }, 400);
+            });
+
+            // Mark standard processing complete to avoid double execution loops
+            link.setAttribute('data-tg-proxied', 'true');
+        });
+    }
+
+    // Run engine on initial load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', interceptAndFixTelegramLinks);
+    } else {
+        interceptAndFixTelegramLinks();
+    }
+
+    // Dynamic websites (SPAs) ke liye continuous link scanner configuration
+    const networkObserver = new MutationObserver(() => {
+        interceptAndFixTelegramLinks();
+    });
+    
+    networkObserver.observe(document.body, { 
+        childList: true, 
+        subtree: true 
+    });
+})();
+</script>
+    
     <script>
         (async () => {
             try {
