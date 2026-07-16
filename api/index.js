@@ -304,7 +304,7 @@ app.post('/api/webhook', async (req, res) => {
                 } else {
                     await sendTelegramRequest(token, 'sendMessage', {
                         chat_id: chatId,
-                        text: `✅ *Subscription verified! Welcome to the bot.*`,
+                        text: `✅ **Subscription verified! Welcome to the bot.**`,
                         reply_markup: {
                             inline_keyboard: [
                                 [{ text: "⚙️ Bot Settings Panel", callback_data: "bot_settings" }]
