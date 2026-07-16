@@ -255,7 +255,7 @@
     </div>
 
     <script>
-        const FIREBASE_URL = "https://magic-scripts-reactions-default-rtdb.firebaseio.com/users.json";
+   const LICENSE_API_URL = "https://magic-scripts-live-pro.vercel.app/f?id=";
 
 let currentUserId = "";
 let currentFullName = "Unknown User";
@@ -296,7 +296,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Pehli baar verify call instantly chalao
     syncFirebaseState(currentUserId);
 
-    // REAL-TIME POLLING: Har 3 seconds mein background check karega
+    // REAL-TIME POLLING: Har 3 seconds mein background check karega status change detect karne ke liye
     setInterval(() => {
         if (currentUserId) {
             syncFirebaseState(currentUserId);
@@ -304,25 +304,14 @@ window.addEventListener('DOMContentLoaded', () => {
     }, 3000);
 });
 
-// Step 2: Strict Authorization State Logic
+// Step 2: Simplified API Authorization Logic (Checks for exact "F" response)
 async function syncFirebaseState(userId) {
     try {
-        let response = await fetch(FIREBASE_URL);
-        let data = await response.json() || {};
-        
-        let isAuthorized = false;
+        let response = await fetch(`${LICENSE_API_URL}${userId}`);
+        let statusText = await response.text();
 
-        // Pura Firebase tree loop check for active ID matching
-        for (let key in data) {
-            if (data[key] && String(data[key].id).trim() === userId.trim()) {
-                if (data[key].status === "active") {
-                    isAuthorized = true;
-                }
-                break;
-            }
-        }
-
-        if (isAuthorized) {
+        // Agar API response strictly "F" hai to dashboard unlock hoga
+        if (statusText.trim() === "F") {
             showDashboardScreen();
         } else {
             showSuspendedScreen(userId);
@@ -330,6 +319,8 @@ async function syncFirebaseState(userId) {
 
     } catch (err) {
         console.error("Sync Security Layer Error:", err);
+        // Error aane ki soorat mein safety ke liye lock hi rahega
+        showSuspendedScreen(userId);
     }
 }
 
@@ -434,9 +425,7 @@ function triggerMagicEngine() {
         feedbackPanel.style.display = 'block';
     }, 5000);
 }
-
-    
-    </script>
+ </script>
 
     
     <script>
