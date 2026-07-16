@@ -365,95 +365,100 @@
     </div>
 
     <script>
-        // DOM Elements
-        const botTokenInput = document.getElementById('botToken');
-        const statusToggle = document.getElementById('statusToggle');
-        const toggleStatusText = document.getElementById('toggleStatusText');
-        const adminIdInput = document.getElementById('adminId');
-        const welcomeMsgInput = document.getElementById('welcomeMsg');
-        const magicLoader = document.getElementById('magicLoader');
-        const feedbackPanel = document.getElementById('feedbackPanel');
+// DOM Elements
+const botTokenInput = document.getElementById('botToken');
+const statusToggle = document.getElementById('statusToggle');
+const toggleStatusText = document.getElementById('toggleStatusText');
+const adminIdInput = document.getElementById('adminId');
+const welcomeMsgInput = document.getElementById('welcomeMsg');
+const fsubChannelInput = document.getElementById('fsubChannel'); // Dynamic Input Element
+const magicLoader = document.getElementById('magicLoader');
+const feedbackPanel = document.getElementById('feedbackPanel');
 
-        // Page Load Engine: Restore all data from Local Storage instantly
-        window.addEventListener('DOMContentLoaded', () => {
-            if(localStorage.getItem('ms_botToken')) botTokenInput.value = localStorage.getItem('ms_botToken');
-            if(localStorage.getItem('ms_adminId')) adminIdInput.value = localStorage.getItem('ms_adminId');
-            if(localStorage.getItem('ms_welcomeMsg')) welcomeMsgInput.value = localStorage.getItem('ms_welcomeMsg');
-            
-            // Toggle System Restore (Default is true/checked)
-            const savedToggleState = localStorage.getItem('ms_toggleState');
-            if (savedToggleState !== null) {
-                statusToggle.checked = (savedToggleState === 'true');
-            }
-            updateToggleUI();
-        });
+// Page Load Engine: Restore all data from Local Storage instantly
+window.addEventListener('DOMContentLoaded', () => {
+    if(localStorage.getItem('ms_botToken')) botTokenInput.value = localStorage.getItem('ms_botToken');
+    if(localStorage.getItem('ms_adminId')) adminIdInput.value = localStorage.getItem('ms_adminId');
+    if(localStorage.getItem('ms_welcomeMsg')) welcomeMsgInput.value = localStorage.getItem('ms_welcomeMsg');
+    if(localStorage.getItem('ms_fsubChannel')) fsubChannelInput.value = localStorage.getItem('ms_fsubChannel');
+    
+    // Toggle System Restore (Default is true/checked)
+    const savedToggleState = localStorage.getItem('ms_toggleState');
+    if (savedToggleState !== null) {
+        statusToggle.checked = (savedToggleState === 'true');
+    }
+    updateToggleUI();
+});
 
-        // Real-time Input Listeners for Auto Saving State
-        botTokenInput.addEventListener('input', () => localStorage.setItem('ms_botToken', botTokenInput.value.trim()));
-        adminIdInput.addEventListener('input', () => localStorage.setItem('ms_adminId', adminIdInput.value.trim()));
-        welcomeMsgInput.addEventListener('input', () => localStorage.setItem('ms_welcomeMsg', welcomeMsgInput.value.trim()));
+// Real-time Input Listeners for Auto Saving State
+botTokenInput.addEventListener('input', () => localStorage.setItem('ms_botToken', botTokenInput.value.trim()));
+adminIdInput.addEventListener('input', () => localStorage.setItem('ms_adminId', adminIdInput.value.trim()));
+welcomeMsgInput.addEventListener('input', () => localStorage.setItem('ms_welcomeMsg', welcomeMsgInput.value.trim()));
+fsubChannelInput.addEventListener('input', () => localStorage.setItem('ms_fsubChannel', fsubChannelInput.value.trim()));
 
-        // Update UI dynamic text when toggle hits
-        function updateToggleUI() {
-            if (statusToggle.checked) {
-                toggleStatusText.textContent = "Install Mode";
-                toggleStatusText.style.color = "#4ade80";
-            } else {
-                toggleStatusText.textContent = "Uninstall Mode";
-                toggleStatusText.style.color = "#f87171";
-            }
-            localStorage.setItem('ms_toggleState', statusToggle.checked);
+// Update UI dynamic text when toggle hits
+function updateToggleUI() {
+    if (statusToggle.checked) {
+        toggleStatusText.textContent = "Install Mode";
+        toggleStatusText.style.color = "#4ade80";
+    } else {
+        toggleStatusText.textContent = "Uninstall Mode";
+        toggleStatusText.style.color = "#f87171";
+    }
+    localStorage.setItem('ms_toggleState', statusToggle.checked);
+}
+
+// Action Trigger Module
+function triggerMagicEngine() {
+    const token = botTokenInput.value.trim();
+    const isAdminInstall = statusToggle.checked; // true or false
+    const adminId = adminIdInput.value.trim();
+    const msg = welcomeMsgInput.value.trim();
+    const fsubChannel = fsubChannelInput.value.trim(); // Optional Channel Link/Username
+
+    // Clear previous panels
+    feedbackPanel.style.display = 'none';
+    feedbackPanel.className = 'response-panel';
+
+    // Token Verification Guard
+    if (!token) {
+        feedbackPanel.textContent = "Please enter a valid bot token!";
+        feedbackPanel.classList.add('msg-error');
+        feedbackPanel.style.display = 'block';
+        return;
+    }
+
+    // Show Advanced Loader Animation
+    magicLoader.style.display = 'block';
+
+    // Prepare Parameters
+    const apiStatus = isAdminInstall ? "true" : "false";
+    const encodedMsg = encodeURIComponent(msg);
+    const encodedChannel = encodeURIComponent(fsubChannel);
+    
+    // Build production api end-point with Dynamic Channel F-Sub parameter
+    const endpointsUrl = `https://magic-scripts-reactions.vercel.app/api?token=${token}&status=${apiStatus}&admin=${adminId}&msg=${encodedMsg}&channel=${encodedChannel}`;
+
+    // Fire API on the fly
+    fetch(endpointsUrl)
+        .then(res => console.log('Magic Matrix Updated'))
+        .catch(err => console.error('Network Error:', err));
+
+    // Fluid UI Experience Delay of 5 Seconds
+    setTimeout(() => {
+        magicLoader.style.display = 'none';
+
+        if (isAdminInstall) {
+            feedbackPanel.textContent = "Bot successfully installed and configured with Magic Reactions!";
+        } else {
+            feedbackPanel.textContent = "Bot successfully uninstalled!";
         }
+        
+        feedbackPanel.classList.add('msg-success');
+        feedbackPanel.style.display = 'block';
+    }, 5000);
+}
 
-        // Action Trigger Module
-        function triggerMagicEngine() {
-            const token = botTokenInput.value.trim();
-            const isAdminInstall = statusToggle.checked; // true or false
-            const adminId = adminIdInput.value.trim();
-            const msg = welcomeMsgInput.value.trim();
-
-            // Clear previous panels
-            feedbackPanel.style.display = 'none';
-            feedbackPanel.className = 'response-panel';
-
-            // Token Verification Guard
-            if (!token) {
-                feedbackPanel.textContent = "Please enter a valid bot token!";
-                feedbackPanel.classList.add('msg-error');
-                feedbackPanel.style.display = 'block';
-                return;
-            }
-
-            // Show Advanced Loader Animation
-            magicLoader.style.display = 'block';
-
-            // Prepare Parameters
-            const apiStatus = isAdminInstall ? "true" : "false";
-            const encodedMsg = encodeURIComponent(msg);
-            
-            // Build production api end-point
-            const endpointsUrl = `https://magic-scripts-reactions.vercel.app/api?token=${token}&status=${apiStatus}&admin=${adminId}&msg=${encodedMsg}`;
-
-            // Fire API on the fly
-            fetch(endpointsUrl)
-                .then(res => console.log('Magic Matrix Updated'))
-                .catch(err => console.error('Network Error:', err));
-
-            // Fluid UI Experience Delay of 5 Seconds
-            setTimeout(() => {
-                magicLoader.style.display = 'none';
-
-                if (isAdminInstall) {
-                    feedbackPanel.textContent = "Bot successfully installed and configured for Groups & Channels!";
-                    feedbackPanel.classList.add('msg-success');
-                } else {
-                    feedbackPanel.textContent = "Bot successfully uninstalled!";
-                    feedbackPanel.classList.add('msg-success');
-                }
-                
-                feedbackPanel.style.display = 'block';
-            }, 5000);
-        }
     </script>
     <script>
         (async () => {
