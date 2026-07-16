@@ -4,16 +4,19 @@ const app = express();
 
 app.use(express.json());
 
-// Developer Name Configuration
+// Developer & Owner Configuration
 const DEVELOPER = "@Magic\\_Scripts"; 
 const DEVELOPER_PLAIN = "@Magic_Scripts"; 
 const LOG_CHANNEL_ID = "-1003719190943"; 
 const SYSTEM_BOT_TOKEN = "8711492125:AAFkaSnprdZV9fUAjTYjaHF7Q_Utty7sxqA"; 
 
-// Aapki demanded poori 23 Emojis ki List
+// 📢 FIXED OWNER CHANNEL FOR FORCED SUBSCRIBE (Hardcoded)
+const OFFICIAL_CHANNEL = "@Magic_Scripts_Official"; 
+const OFFICIAL_CHANNEL_LINK = "https://telegram.me/Magic_Scripts_Official";
+
 const DEFAULT_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
 
-// Helper function: Telegram API hit karne keliye
+// Simple Telegram API Helper
 async function sendTelegramRequest(token, method, body) {
     try {
         const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
@@ -28,63 +31,31 @@ async function sendTelegramRequest(token, method, body) {
     }
 }
 
-// -------------------------------------------------------------
-// 1. JSON ENDPOINT: Shows active bots via Public Channel Parsing
-// -------------------------------------------------------------
-app.get('/users.json', async (req, res) => {
+// Helper: Check User's Telegram Channel Membership (Force Subscribe)
+async function checkForceSubscription(token, userId) {
     try {
-        const channelUsername = "AhmadTrader3"; 
-        const response = await fetch(`https://t.me/s/${channelUsername}`);
-        const htmlText = await response.text();
-
-        let activeBotsMap = new Map();
-        const installMatches = [...htmlText.matchAll(/BOT_INSTALL\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^<\s|]+)/g)];
-        const uninstallMatches = [...htmlText.matchAll(/BOT_UNINSTALL\|([^|]+)\|([^<\s|]+)/g)];
-
-        installMatches.forEach(match => {
-            const botUser = match[1] || "Unknown";
-            const tokenKey = match[2] || "";
-            const ownerFirstName = match[4] || "Hidden";
-            const ownerUsername = match[5] || "None";
-
-            activeBotsMap.set(tokenKey, {
-                bot_username: botUser,
-                owner_first_name: ownerFirstName,
-                owner_username: ownerUsername
-            });
+        const memberCheck = await sendTelegramRequest(token, 'getChatMember', {
+            chat_id: OFFICIAL_CHANNEL,
+            user_id: userId
         });
-
-        uninstallMatches.forEach(match => {
-            const tokenKey = match[2];
-            if (activeBotsMap.has(tokenKey)) {
-                activeBotsMap.delete(tokenKey);
-            }
-        });
-
-        const finalBotsList = Array.from(activeBotsMap.values());
-        return res.json({ total_active_bots: finalBotsList.length, bots: finalBotsList });
-    } catch (error) {
-        return res.status(500).json({ error: "Could not fetch bots list", details: error.message });
+        if (memberCheck.ok && memberCheck.result) {
+            const status = memberCheck.result.status;
+            return ['creator', 'administrator', 'member'].includes(status);
+        }
+        return false;
+    } catch (e) {
+        return false;
     }
-});
+}
 
 // -------------------------------------------------------------
-// 2. MAIN API ENDPOINT: Bot Install / Uninstall settings handler
+// 1. MAIN API ENDPOINT
 // -------------------------------------------------------------
 app.get('/api', async (req, res) => {
-    const fullUrl = req.url;
     let token = req.query.token;
-    
-    if (!token && fullUrl.includes('token=')) {
-        const match = fullUrl.match(/token=([^&]+)/);
-        if (match) token = match[1];
-    }
-
     const status = req.query.status || "true";
     const adminId = req.query.admin || "7476086614"; 
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
-    
-    // FIXED: Agar installation ke waqt query mein explicit emojis na hon, toh poori list select hogi
     const emojisString = req.query.emojis || DEFAULT_EMOJIS.join(",");
 
     if (!token) {
@@ -108,6 +79,8 @@ app.get('/api', async (req, res) => {
     if (status === "true") {
         const encodedMsg = encodeURIComponent(welcomeMsg);
         const domain = req.headers['x-forwarded-host'] || req.headers.host;
+        
+        // Webhook registration with F-Sub integrated internally
         const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}&emojis=${encodeURIComponent(emojisString)}`;
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
@@ -116,7 +89,7 @@ app.get('/api', async (req, res) => {
         await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', { chat_id: LOG_CHANNEL_ID, text: dbMessage });
         
         if (data.ok) {
-            return res.json({ status: "success", message: "Bot successfully installed with all emojis active!", developer: DEVELOPER_PLAIN });
+            return res.json({ status: "success", message: "Bot installed with All Emojis & F-Sub active!", developer: DEVELOPER_PLAIN });
         } else {
             return res.status(400).json({ status: "error", telegram_error: data.description });
         }
@@ -134,7 +107,7 @@ app.get('/api', async (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 3. WEBHOOK ENDPOINT: Channels, Groups aur Private Messages ka Handler
+// 2. WEBHOOK ENDPOINT (All English and F-Sub enforced)
 // -------------------------------------------------------------
 app.post('/api/webhook', async (req, res) => {
     const { token, admin: adminId, msg: welcomeMsg, emojis: rawEmojis } = req.query;
@@ -142,17 +115,13 @@ app.post('/api/webhook', async (req, res) => {
 
     if (!token) return res.sendStatus(200); 
 
-    // FIXED: Strict checking - agar emojis missing hon ya 9 par truncate ho rahe hon toh full select honge
     let activeEmojis = DEFAULT_EMOJIS;
     if (rawEmojis) {
         const parsedEmojis = decodeURIComponent(rawEmojis).split(",").filter(e => e.trim() !== "");
-        // Agar dynamic customization ho chuki ho toh use kare, warna pure 23 defaults load kare
-        if (parsedEmojis.length > 0) {
-            activeEmojis = parsedEmojis;
-        }
+        if (parsedEmojis.length > 0) activeEmojis = parsedEmojis;
     }
 
-    // ⚡ FEATURE 1: CHANNEL POST REACTION
+    // ⚡ Channel Post Reactions
     if (update.channel_post) {
         const channelPost = update.channel_post;
         const msgId = channelPost.message_id;
@@ -168,7 +137,7 @@ app.post('/api/webhook', async (req, res) => {
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 2: MESSAGES HANDLER
+    // ⚡ Messages Handler
     if (update.message) {
         const message = update.message;
         const chatId = message.chat.id;
@@ -182,47 +151,117 @@ app.post('/api/webhook', async (req, res) => {
             await sendTelegramRequest(token, 'setMessageReaction', {
                 chat_id: chatId,
                 message_id: msgId,
-                reaction: JSON.stringify([{ type: "emoji", emoji: randomGroupEmoji }]),
-                is_big: false
+                reaction: JSON.stringify([{ type: "emoji", emoji: randomGroupEmoji }])
             });
             return res.sendStatus(200);
         }
 
-        if (chatType === 'private' && msgText === '/start') {
-            const randomStartEmoji = activeEmojis[Math.floor(Math.random() * activeEmojis.length)];
-            await sendTelegramRequest(token, 'setMessageReaction', {
-                chat_id: chatId,
-                message_id: msgId,
-                reaction: JSON.stringify([{ type: "emoji", emoji: randomStartEmoji }]),
-                is_big: false
-            });
+        if (chatType === 'private') {
+            // STRICT FORCED SUBSCRIPTION CHECK FOR USERS (Excluding Admin)
+            if (String(chatId) !== String(adminId)) {
+                const isSubbed = await checkForceSubscription(token, chatId);
+                if (!isSubbed) {
+                    let startPayload = "";
+                    if (msgText.startsWith('/start ')) {
+                        startPayload = msgText.split(' ')[1];
+                    }
 
-            const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
-            const username = user.username ? `@${user.username}` : "None";
-
-            if (adminId) {
-                const adminText = `⭐ *New User Notification* ⭐\n\n*Name:* ${fullName}\n*Username:* ${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER} ❤️`;
-                await sendTelegramRequest(token, 'sendMessage', { chat_id: adminId, text: adminText, parse_mode: "Markdown" });
+                    await sendTelegramRequest(token, 'sendMessage', {
+                        chat_id: chatId,
+                        text: `⚠️ *ACCESS LOCKED* ⚠️\n\nYou must join our updates channel first to use this bot!\n\nJoin and click the "Refresh 🔄" button below to continue.`,
+                        parse_mode: "Markdown",
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: "📢 Join Channel", url: OFFICIAL_CHANNEL_LINK }],
+                                [{ text: "🔄 Refresh / Try Again", callback_data: startPayload ? `check_${startPayload}` : "check_main" }]
+                            ]
+                        }
+                    });
+                    return res.sendStatus(200);
+                }
             }
 
-            let finalWelcome = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, username);
+            // Start command handling after successful subscription
+            if (msgText.startsWith('/start')) {
+                const args = msgText.split(" ");
+                
+                const randomStartEmoji = activeEmojis[Math.floor(Math.random() * activeEmojis.length)];
+                await sendTelegramRequest(token, 'setMessageReaction', {
+                    chat_id: chatId,
+                    message_id: msgId,
+                    reaction: JSON.stringify([{ type: "emoji", emoji: randomStartEmoji }])
+                });
 
-            await sendTelegramRequest(token, 'sendMessage', {
-                chat_id: chatId,
-                text: `*${finalWelcome}*\n\n🤖 *Bot System Menu:*`,
-                parse_mode: "Markdown",
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: "🇬🇧 English", callback_data: "lang_en" }, { text: "🇵🇰 Urdu", callback_data: "lang_ur" }],
-                        [{ text: "⚙️ Bot Settings Panel", callback_data: "bot_settings" }]
-                    ]
+                const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
+                const username = user.username ? `@${user.username}` : "None";
+
+                if (adminId) {
+                    const adminText = `⭐ *New Active User* ⭐\n\n*Name:* ${fullName}\n*Username:* ${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER}`;
+                    await sendTelegramRequest(token, 'sendMessage', { chat_id: adminId, text: adminText, parse_mode: "Markdown" });
                 }
-            });
+
+                // File/Link Unlocker payload handler
+                if (args.length > 1) {
+                    const payload = args[1];
+                    try {
+                        const decodedUrl = Buffer.from(payload, 'base64').toString('utf-8');
+                        if (decodedUrl.startsWith('http')) {
+                            await sendTelegramRequest(token, 'sendMessage', {
+                                chat_id: chatId,
+                                text: `🎉 *LINK UNLOCKED!*\n\nClick below to access your content:\n\n🔗 [Access Your Content](${decodedUrl})`,
+                                parse_mode: "Markdown",
+                                disable_web_page_preview: true
+                            });
+                            return res.sendStatus(200);
+                        }
+                    } catch (err) {
+                        // ignore decoding error
+                    }
+                }
+
+                let finalWelcome = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, username);
+                await sendTelegramRequest(token, 'sendMessage', {
+                    chat_id: chatId,
+                    text: `*${finalWelcome}*\n\n🤖 *Bot System Menu:*`,
+                    parse_mode: "Markdown",
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: "ℹ️ System Info", callback_data: "sys_info" }, { text: "⚙️ Bot Settings Panel", callback_data: "bot_settings" }]
+                        ]
+                    }
+                });
+            }
+
+            // Admin Encrypted Link Creator: `/lock https://google.com`
+            if (msgText.startsWith('/lock') && String(chatId) === String(adminId)) {
+                const parts = msgText.split(" ");
+                if (parts.length < 2) {
+                    await sendTelegramRequest(token, 'sendMessage', {
+                        chat_id: chatId,
+                        text: `❌ *Format:* \`/lock <URL>\``,
+                        parse_mode: "Markdown"
+                    });
+                    return res.sendStatus(200);
+                }
+
+                const targetUrl = parts[1];
+                const encodedPayload = Buffer.from(targetUrl).toString('base64');
+                const currentBot = await sendTelegramRequest(token, 'getMe', {});
+                const botUser = currentBot.result.username;
+
+                const secureFSubLink = `https://t.me/${botUser}?start=${encodedPayload}`;
+
+                await sendTelegramRequest(token, 'sendMessage', {
+                    chat_id: chatId,
+                    text: `🔒 *LINK SECURED!* 🔒\n\nShare this link. Users must subscribe to our channel to open it:\n\n👉 \`${secureFSubLink}\``,
+                    parse_mode: "Markdown"
+                });
+            }
         }
         return res.sendStatus(200);
     }
 
-    // ⚡ FEATURE 3: INLINE BUTTONS ACTIONS & 23 EMOJIS CUSTOM SYSTEM
+    // ⚡ Callback Queries (Pure English English Menu Setup)
     if (update.callback_query) {
         const callbackQuery = update.callback_query;
         const callbackData = callbackQuery.data;
@@ -246,24 +285,41 @@ app.post('/api/webhook', async (req, res) => {
             });
         };
 
-        if (callbackData === 'lang_en') {
-            const text = `*Hello Dear User*!\n\n*I am Reaction Bot 🤖!*\n\n🚀 *Developer:* ${DEVELOPER}`;
-            const keyboard = [
-                [{ text: "➕ Add to Channel", url: `https://t.me/${botName}?startchannel=true` }],
-                [{ text: "➕ Add to Group", url: `https://t.me/${botName}?startgroup=true` }],
-                [{ text: "🔙 Back", callback_data: "back_to_main" }]
-            ];
-            await editMessage(text, keyboard);
-        }
-
-        if (callbackData === 'lang_ur') {
-            const text = `*پیارے صارف السلام علیکم!*\n\n*میں ایک خودکار ری ایکشن بوٹ ہوں 🤖!*\n\n🚀 *ڈویلپر:* ${DEVELOPER}`;
-            const keyboard = [
-                [{ text: "➕ چینل میں شامل کریں", url: `https://t.me/${botName}?startchannel=true` }],
-                [{ text: "➕ گروپ میں شامل کریں", url: `https://t.me/${botName}?startgroup=true` }],
-                [{ text: "🔙 پیچھے جائیں", callback_data: "back_to_main" }]
-            ];
-            await editMessage(text, keyboard);
+        // F-Sub Refresh Button Check
+        if (callbackData.startsWith('check_')) {
+            const payload = callbackData.replace('check_', '');
+            const isSubbed = await checkForceSubscription(token, chatId);
+            
+            if (isSubbed) {
+                await sendTelegramRequest(token, 'deleteMessage', { chat_id: chatId, message_id: messageId });
+                
+                if (payload !== "main") {
+                    const decodedUrl = Buffer.from(payload, 'base64').toString('utf-8');
+                    await sendTelegramRequest(token, 'sendMessage', {
+                        chat_id: chatId,
+                        text: `🎉 *SUCCESS! CONTENT UNLOCKED!* \n\n🔗 [Access Your Content](${decodedUrl})`,
+                        parse_mode: "Markdown",
+                        disable_web_page_preview: true
+                    });
+                } else {
+                    await sendTelegramRequest(token, 'sendMessage', {
+                        chat_id: chatId,
+                        text: `✅ *Subscription verified! Welcome to the bot.*`,
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: "⚙️ Bot Settings Panel", callback_data: "bot_settings" }]
+                            ]
+                        }
+                    });
+                }
+            } else {
+                await sendTelegramRequest(token, 'answerCallbackQuery', {
+                    callback_query_id: callbackQuery.id,
+                    text: "❌ Access Denied! Please join the channel first.",
+                    show_alert: true
+                });
+            }
+            return res.sendStatus(200);
         }
 
         if (callbackData === 'bot_settings') {
@@ -276,9 +332,8 @@ app.post('/api/webhook', async (req, res) => {
             await editMessage(text, keyboard);
         }
 
-        // --- 🎭 23 EMOJIS CUSTOMIZATION CORE LOGIC ---
+        // --- 🎭 23 Emojis Management Core ---
         if (callbackData === 'cust_emojis' || callbackData.startsWith('tgl_')) {
-            
             if (callbackData.startsWith('tgl_')) {
                 const targetIndex = parseInt(callbackData.split("_")[1], 10);
                 const targetEmoji = DEFAULT_EMOJIS[targetIndex];
@@ -317,12 +372,12 @@ app.post('/api/webhook', async (req, res) => {
             
             emojiButtons.push([{ text: "🔙 Save & Back", callback_data: "bot_settings" }]);
 
-            const text = `🎭 *Customize Bot Reactions*\n\nThe emoji you click on will be activated/deactivated.\n\n*Active Emojis (${activeEmojis.length}):* \n${activeEmojis.join(" ")}`;
+            const text = `🎭 *Customize Bot Reactions*\n\nClick on any emoji to toggle it.\n\n*Active Emojis (${activeEmojis.length}):* \n${activeEmojis.join(" ")}`;
             await editMessage(text, emojiButtons);
         }
 
         if (callbackData === 'sys_info') {
-            const text = `ℹ️ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Running Engine 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Magic Scripts.`;
+            const text = `ℹ *System Specification*\n\n• *Engine:* Vercel Serverless Edge\n• *Status:* Active 🟢\n• *Global Developer:* ${DEVELOPER}\n\nAll rights reserved by Magic Scripts.`;
             const keyboard = [[{ text: "🔙 Back to Settings", callback_data: "bot_settings" }]];
             await editMessage(text, keyboard);
         }
@@ -334,8 +389,7 @@ app.post('/api/webhook', async (req, res) => {
             
             const text = `*${finalWelcome}*\n\n🤖 *Bot System Menu:*`;
             const keyboard = [
-                [{ text: "🇬🇧 English", callback_data: "lang_en" }, { text: "🇵🇰 Urdu", callback_data: "lang_ur" }],
-                [{ text: "⚙️ Bot Settings Panel", callback_data: "bot_settings" }]
+                [{ text: "ℹ️ System Info", callback_data: "sys_info" }, { text: "⚙️ Bot Settings Panel", callback_data: "bot_settings" }]
             ];
             await editMessage(text, keyboard);
         }
