@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+
+<defs>
+
+<linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#E120E4"/>
+<stop offset="50%" stop-color="#C54FDA"/>
+<stop offset="100%" stop-color="#9B0BE1"/>
+</linearGradient>
+
+<linearGradient id="text" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="100%" stop-color="#A480D3"/>
+</linearGradient>
+
+<filter id="shadow">
+<feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#5B21B6" flood-opacity=".45"/>
+</filter>
+
+</defs>
+
+<!-- Background -->
+<circle cx="256" cy="256" r="220"
+fill="url(#bg)"
+filter="url(#shadow)"/>
+
+<!-- Border -->
+<circle cx="256" cy="256" r="205"
+fill="none"
+stroke="#FFFFFF"
+stroke-opacity=".8"
+stroke-width="6"/>
+
+<!-- Magic Sparkles -->
+<polygon points="256,70 262,88 280,94 262,100 256,118 250,100 232,94 250,88"
+fill="#FFFFFF"/>
+
+<polygon points="120,170 124,180 134,184 124,188 120,198 116,188 106,184 116,180"
+fill="#FFFFFF" opacity=".8"/>
+
+<polygon points="392,170 396,180 406,184 396,188 392,198 388,188 378,184 388,180"
+fill="#FFFFFF" opacity=".8"/>
+
+
+<!-- MS -->
+<text x="256"
+y="250"
+text-anchor="middle"
+font-size="110"
+font-family="Georgia,serif"
+font-weight="700"
+fill="url(#text)">
+MS
+</text>
+
+<!-- Brand -->
+<text x="256"
+y="335"
+text-anchor="middle"
+font-size="42"
+font-family="Arial"
+font-weight="700"
+letter-spacing="3"
+fill="#FFFFFF">
+MAGIC
+</text>
+
+<text x="256"
+y="372"
+text-anchor="middle"
+font-size="26"
+font-family="Arial"
+letter-spacing="7"
+fill="#E9D5FF">
+SCRIPTS
+</text>
+
+</svg>
