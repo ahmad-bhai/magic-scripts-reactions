@@ -29,7 +29,6 @@ async function sendTelegramRequest(token, method, body) {
 
 // Helper: Check User's Telegram Channel Membership (Dynamic Channel)
 async function checkForceSubscription(token, channelUsername, userId) {
-    // Agar username clean nahi hai, handle formats like @username or links
     let chatId = channelUsername.trim();
     if (chatId.includes("t.me/")) {
         chatId = "@" + chatId.split("t.me/")[1].split("/")[0];
@@ -51,7 +50,6 @@ async function checkForceSubscription(token, channelUsername, userId) {
         }
         return false;
     } catch (e) {
-        // Agar bot admin nahi hai ya chat not found hai to safe-fail to prevent blocking
         return false;
     }
 }
@@ -78,7 +76,6 @@ app.get('/api', async (req, res) => {
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
     const emojisString = req.query.emojis || DEFAULT_EMOJIS.join(",");
     
-    // Dynamic F-Sub channel parsed from frontend query
     const fsubChannel = req.query.channel ? req.query.channel.trim() : "";
 
     if (!token) {
@@ -103,7 +100,6 @@ app.get('/api', async (req, res) => {
         const encodedMsg = encodeURIComponent(welcomeMsg);
         const domain = req.headers['x-forwarded-host'] || req.headers.host;
         
-        // Pass dynamic channel variable to webhook url
         const webhookUrl = `https://${domain}/api/webhook?token=${token}&admin=${adminId}&msg=${encodedMsg}&emojis=${encodeURIComponent(emojisString)}&channel=${encodeURIComponent(fsubChannel)}`;
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
@@ -144,7 +140,7 @@ app.post('/api/webhook', async (req, res) => {
         if (parsedEmojis.length > 0) activeEmojis = parsedEmojis;
     }
 
-    // ⚡ Channel Post Reactions (Automated)
+    // ⚡ Channel Post Reactions
     if (update.channel_post) {
         const channelPost = update.channel_post;
         const msgId = channelPost.message_id;
@@ -180,8 +176,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (chatType === 'private') {
-            // 🛡️ OPTIONAL FORCED SUBSCRIBE CHECK
-            // Agar user ne dashboard par apna channel set kiya hai (fsubChannel exists & not empty)
+            // Force Subscribe check
             if (fsubChannel && fsubChannel.trim() !== "" && String(chatId) !== String(adminId)) {
                 const isSubbed = await checkForceSubscription(token, fsubChannel, chatId);
                 if (!isSubbed) {
@@ -207,7 +202,7 @@ app.post('/api/webhook', async (req, res) => {
                 }
             }
 
-            // Start command handling (Subscribed OR No F-Sub Configured)
+            // Start command handling
             if (msgText.startsWith('/start')) {
                 const args = msgText.split(" ");
                 
@@ -221,7 +216,7 @@ app.post('/api/webhook', async (req, res) => {
                 const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
                 const username = user.username ? `@${user.username}` : "None";
 
-                if (adminId) {
+                if (adminId && String(chatId) !== String(adminId)) {
                     const adminText = `⭐ *New Active User* ⭐\n\n*Name:* ${fullName}\n*Username:* ${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER}`;
                     await sendTelegramRequest(token, 'sendMessage', { chat_id: adminId, text: adminText, parse_mode: "Markdown" });
                 }
@@ -240,9 +235,7 @@ app.post('/api/webhook', async (req, res) => {
                             });
                             return res.sendStatus(200);
                         }
-                    } catch (err) {
-                        // error decode ignore
-                    }
+                    } catch (err) {}
                 }
 
                 let finalWelcome = welcomeMsg.replace(/{name}/g, fullName).replace(/{username}/g, username);
@@ -258,7 +251,7 @@ app.post('/api/webhook', async (req, res) => {
                 });
             }
 
-            // Admin Encrypted Link Creator: `/lock https://google.com`
+            // Admin Encrypted Link Creator
             if (msgText.startsWith('/lock') && String(chatId) === String(adminId)) {
                 const parts = msgText.split(" ");
                 if (parts.length < 2) {
@@ -294,6 +287,7 @@ app.post('/api/webhook', async (req, res) => {
         const messageId = callbackQuery.message.message_id;
         const chatId = callbackQuery.message.chat.id;
         const user = callbackQuery.from;
+        const isOwner = String(user.id) === String(adminId);
 
         const editMessage = async (text, keyboard) => {
             await sendTelegramRequest(token, 'editMessageText', {
@@ -305,12 +299,10 @@ app.post('/api/webhook', async (req, res) => {
             });
         };
 
-        // F-Sub Dynamic Membership Refresh Verify Action
         if (callbackData.startsWith('check_')) {
             const payload = callbackData.replace('check_', '');
             let isSubbed = true;
 
-            // Check only if channel configuration is active
             if (fsubChannel && fsubChannel.trim() !== "") {
                 isSubbed = await checkForceSubscription(token, fsubChannel, chatId);
             }
@@ -349,15 +341,29 @@ app.post('/api/webhook', async (req, res) => {
 
         if (callbackData === 'bot_settings') {
             const text = `🛠 *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n👑 *System Owner:* ${DEVELOPER}`;
-            const keyboard = [
-                [{ text: "⚙️ Customize Emojis", callback_data: "cust_emojis" }],
-                [{ text: "ℹ️ System Info", callback_data: "sys_info" }],
-                [{ text: "🔙 Back to Menu", callback_data: "back_to_main" }]
-            ];
+            
+            const keyboard = [];
+            // Sirf owner ko hi emoji customize karne ka button show hoga
+            if (isOwner) {
+                keyboard.push([{ text: "⚙️ Customize Emojis", callback_data: "cust_emojis" }]);
+            }
+            keyboard.push([{ text: "ℹ️ System Info", callback_data: "sys_info" }]);
+            keyboard.push([{ text: "🔙 Back to Menu", callback_data: "back_to_main" }]);
+
             await editMessage(text, keyboard);
         }
 
         if (callbackData === 'cust_emojis' || callbackData.startsWith('tgl_')) {
+            // Check: Guard against unauthorized non-owner access
+            if (!isOwner) {
+                await sendTelegramRequest(token, 'answerCallbackQuery', {
+                    callback_query_id: callbackQuery.id,
+                    text: "⚠️ Access Denied! Only the bot owner can customize emojis.",
+                    show_alert: true
+                });
+                return res.sendStatus(200);
+            }
+
             if (callbackData.startsWith('tgl_')) {
                 const targetIndex = parseInt(callbackData.split("_")[1], 10);
                 const targetEmoji = DEFAULT_EMOJIS[targetIndex];
