@@ -42,7 +42,6 @@
             position: relative;
         }
 
-        /* Ambient Animated Lights */
         .ambient-glow-1, .ambient-glow-2 {
             position: fixed;
             width: 350px;
@@ -80,7 +79,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Header Navigation */
         .top-header {
             display: flex;
             justify-content: space-between;
@@ -105,6 +103,7 @@
         .tier-free { color: var(--text-muted); border-color: rgba(148, 163, 184, 0.3); }
         .tier-premium { color: var(--gold-glow); border-color: rgba(245, 158, 11, 0.5); background: rgba(245, 158, 11, 0.1); }
 
+        /* Premium Upgrade Button */
         .btn-upgrade {
             background: linear-gradient(135deg, var(--gold-glow) 0%, #d97706 100%);
             color: #fff;
@@ -126,7 +125,11 @@
             box-shadow: 0 0 25px rgba(245, 158, 11, 0.6);
         }
 
-        /* Branding */
+        /* Hide Upgrade Button When Premium */
+        .btn-upgrade.hidden-premium {
+            display: none !important;
+        }
+
         .brand-logo { text-align: center; margin-bottom: 25px; }
         .brand-logo img {
             width: 80px;
@@ -145,7 +148,6 @@
             -webkit-text-fill-color: transparent;
         }
 
-        /* Inputs */
         .input-group { margin-bottom: 18px; }
         .input-group label {
             display: flex;
@@ -175,7 +177,6 @@
             box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
         }
 
-        /* Locked Field Overlay */
         .locked-wrapper { position: relative; }
         .lock-overlay {
             position: absolute;
@@ -194,7 +195,6 @@
             border: 1px dashed rgba(245, 158, 11, 0.4);
         }
 
-        /* Toggle Switch */
         .toggle-box {
             display: flex;
             justify-content: space-between;
@@ -218,7 +218,6 @@
         input:checked + .slider { background: linear-gradient(135deg, var(--green-glow) 0%, #059669 100%); }
         input:checked + .slider:before { transform: translateX(24px); }
 
-        /* Submit Button */
         .btn-submit {
             width: 100%;
             padding: 14px;
@@ -240,23 +239,46 @@
 
         .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(6, 182, 212, 0.4); }
 
-        /* Custom Modals Base - Wide Spacious Layout */
+        /* Modal Overlay System */
         .custom-modal-backdrop {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(3, 7, 18, 0.85); backdrop-filter: blur(10px);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 9999; opacity: 0; pointer-events: none; transition: all 0.3s ease;
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(3, 7, 18, 0.85); 
+            backdrop-filter: blur(10px);
+            display: flex; 
+            justify-content: center; 
+            align-items: center;
+            z-index: 99999; 
+            opacity: 0; 
+            visibility: hidden;
+            pointer-events: none; 
+            transition: opacity 0.3s ease, visibility 0.3s ease;
             padding: 15px;
         }
 
-        .custom-modal-backdrop.active { opacity: 1; pointer-events: auto; }
+        .custom-modal-backdrop.active { 
+            opacity: 1; 
+            visibility: visible;
+            pointer-events: auto; 
+        }
 
         .custom-modal {
-            background: #0f172a; border: 1px solid var(--panel-border);
-            border-radius: 24px; padding: 28px 22px; width: 100%; max-width: 480px;
-            text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
-            transform: scale(0.85); transition: transform 0.3s ease; position: relative;
-            max-height: 90vh; overflow-y: auto;
+            background: #0f172a; 
+            border: 1px solid var(--panel-border);
+            border-radius: 24px; 
+            padding: 28px 22px; 
+            width: 100%; 
+            max-width: 480px;
+            text-align: center; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            transform: scale(0.85); 
+            transition: transform 0.3s ease; 
+            position: relative;
+            max-height: 90vh; 
+            overflow-y: auto;
         }
 
         .custom-modal-backdrop.active .custom-modal { transform: scale(1); }
@@ -271,7 +293,6 @@
         .modal-title { font-size: 21px; font-weight: 800; color: #fff; margin-bottom: 8px; }
         .modal-desc { font-size: 13px; color: var(--text-muted); margin-bottom: 22px; line-height: 1.5; }
 
-        /* Payment Details Area - Open Stacked Format */
         .payment-box {
             background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(255,255,255,0.08);
             border-radius: 16px; padding: 16px; text-align: left; margin-bottom: 20px;
@@ -325,7 +346,6 @@
         }
         .btn-copy:hover { background: rgba(6, 182, 212, 0.3); }
 
-        /* TxID Verification Input - Spacious Vertical Stack */
         .txid-section {
             background: rgba(15, 23, 42, 0.8);
             border: 1px solid rgba(139, 92, 246, 0.35);
@@ -394,8 +414,15 @@
         }
 
         .btn-close-modal {
-            background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff;
-            padding: 12px 20px; border-radius: 12px; font-weight: 700; cursor: pointer; width: 100%; transition: all 0.3s ease;
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid rgba(255,255,255,0.1); 
+            color: #fff;
+            padding: 12px 20px; 
+            border-radius: 12px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            width: 100%; 
+            transition: all 0.3s ease;
         }
         .btn-close-modal:hover { background: rgba(255,255,255,0.1); }
     </style>
@@ -406,23 +433,20 @@
     <div class="ambient-glow-2"></div>
 
     <div class="app-container">
-        <!-- Top Status Bar -->
         <div class="top-header">
             <div class="badge-status tier-free" id="userTierDisplay">
                 <i class="fa-solid fa-shield-halved"></i> <span id="tierLabel">FREE MODE</span>
             </div>
-            <button class="btn-upgrade" onclick="openPaymentModal()">
-                <i class="fa-solid fa-crown"></i> AUTO UPGRADE
+            <button class="btn-upgrade" id="btnUpgradeHeader" onclick="openPaymentModal()">
+                <i class="fa-solid fa-crown"></i> UPGRADE
             </button>
         </div>
 
-        <!-- Logo Section -->
         <div class="brand-logo">
             <img src="https://magic-scripts-reactions.vercel.app/logo.svg" alt="Magic Scripts Logo">
             <h1>MAGIC SCRIPTS</h1>
         </div>
 
-        <!-- System Controls Form -->
         <form id="engineForm" onsubmit="event.preventDefault(); processScriptEngine();">
             <div class="input-group">
                 <label for="botToken"><i class="fa-solid fa-robot"></i> Telegram Bot Token</label>
@@ -450,7 +474,6 @@
                 <textarea id="welcomeMessage" rows="2" placeholder="Welcome {name} to Reaction Bot!"></textarea>
             </div>
 
-            <!-- Force Subscribe Lock Field -->
             <div class="input-group">
                 <label for="forceSubChannel"><i class="fa-solid fa-bullhorn"></i> Force Subscribe Channel</label>
                 <div class="locked-wrapper">
@@ -467,7 +490,7 @@
         </form>
     </div>
 
-    <!-- Custom Animated Icon Alert Modal -->
+    <!-- Alert Modal System -->
     <div class="custom-modal-backdrop" id="customAlertModal">
         <div class="custom-modal">
             <div class="modal-icon-wrap" id="alertIconWrap">
@@ -479,7 +502,7 @@
         </div>
     </div>
 
-    <!-- Auto Payment Modal (Wide Open Ground UI) -->
+    <!-- Payment Modal System -->
     <div class="custom-modal-backdrop" id="paymentModal">
         <div class="custom-modal">
             <div class="modal-icon-wrap" style="color: var(--gold-glow); border-color: rgba(245, 158, 11, 0.3);">
@@ -488,7 +511,6 @@
             <div class="modal-title">Instant Auto Upgrade</div>
             <div class="modal-desc">Automatic Payment Gateway. Unlimited Bots, High Speed, & Unlock Force Subscribe Channel!</div>
 
-            <!-- Payment Wallets (Open Stacked Layout) -->
             <div class="payment-box">
                 <div class="pay-card">
                     <div class="pay-card-header">
@@ -501,13 +523,12 @@
                 <div class="pay-card">
                     <div class="pay-card-header">
                         <span class="pay-card-title"><i class="fa-solid fa-coins"></i> USDT (TRC20) Address</span>
-                        <button class="btn-copy" onclick="copyText('TLvd3Q1UpE8Cio8GxrqZzemSVWe8cH5Rxu')"><i class="fa-regular fa-copy"></i> Copy</button>
+                        <button class="btn-copy" onclick="copyText('mytrc')"><i class="fa-regular fa-copy"></i> Copy</button>
                     </div>
-                    <div class="pay-card-value">TLvd3Q1UpE8Cio8GxrqZzemSVWe8cH5Rxu</div>
+                    <div class="pay-card-value">mytrc</div>
                 </div>
             </div>
 
-            <!-- TxID Verification Input (Full Width Vertical Form) -->
             <div class="txid-section">
                 <label for="txHashInput"><i class="fa-solid fa-receipt"></i> ENTER TRANSACTION / ORDER ID</label>
                 <div class="txid-input-group">
@@ -523,10 +544,9 @@
     </div>
 
     <script>
-        const API_SERVER = "https://magic-scripts-admin-panel.vercel.app/p?id=";
+        const DOMAIN = "https://magic-scripts-reactions.vercel.app";
         let isPremiumUser = false;
 
-        // Load Persistent Settings
         window.addEventListener('DOMContentLoaded', () => {
             const savedToken = localStorage.getItem('ms_token');
             const savedAdmin = localStorage.getItem('ms_admin');
@@ -545,7 +565,6 @@
             }
         });
 
-        // Toggle Status Handler
         function handleToggleChange() {
             const toggle = document.getElementById('toggleStatus');
             const label = document.getElementById('toggleText');
@@ -554,7 +573,7 @@
             localStorage.setItem('ms_toggle', toggle.checked);
         }
 
-        // Token Account Check
+        // Token Status Check via Express Backend /p?id= API
         async function checkTokenAccountStatus() {
             const token = document.getElementById('botToken').value.trim();
             if (!token || token.length < 10) return;
@@ -563,7 +582,7 @@
             const botId = token.split(':')[0];
 
             try {
-                const res = await fetch(`${API_SERVER}${botId}`);
+                const res = await fetch(`${DOMAIN}/p?id=${botId}`);
                 const data = await res.json();
 
                 if (data && (data.paidStatus === true || data.status === "paid" || data.premium === true)) {
@@ -576,24 +595,28 @@
             }
         }
 
+        // UI Updates: Premium Active Ho Toh Hide Button, Expire Pe Show Button
         function setPremiumUIStatus(isPrem) {
             isPremiumUser = isPrem;
             const badge = document.getElementById('userTierDisplay');
             const label = document.getElementById('tierLabel');
             const overlay = document.getElementById('fsubLockOverlay');
+            const upgradeBtn = document.getElementById('btnUpgradeHeader');
 
             if (isPrem) {
                 badge.className = "badge-status tier-premium";
                 label.textContent = "PREMIUM ENGINE UNLOCKED";
-                overlay.style.display = "none";
+                overlay.style.display = "none"; // Unlock FSub input field
+                upgradeBtn.classList.add('hidden-premium'); // Hide AUTO UPGRADE button
             } else {
                 badge.className = "badge-status tier-free";
                 label.textContent = "FREE MODE";
-                overlay.style.display = "flex";
+                overlay.style.display = "flex"; // Lock FSub input field
+                upgradeBtn.classList.remove('hidden-premium'); // Show AUTO UPGRADE button again
             }
         }
 
-        // Run Script Process
+        // Run Main Engine /api
         async function processScriptEngine() {
             const token = document.getElementById('botToken').value.trim();
             const status = document.getElementById('toggleStatus').checked;
@@ -610,7 +633,7 @@
             localStorage.setItem('ms_msg', msg);
 
             const botId = token.split(':')[0];
-            const targetUrl = `/api?token=${token}&status=${status}&admin=${admin}&msg=${encodeURIComponent(msg)}&channel=${encodeURIComponent(channel)}&userId=${botId}`;
+            const targetUrl = `${DOMAIN}/api?token=${token}&status=${status}&admin=${admin}&msg=${encodeURIComponent(msg)}&channel=${encodeURIComponent(channel)}&userId=${botId}`;
 
             try {
                 showCustomAlert("Processing", "Executing engine operation, please wait...", "fa-spinner fa-spin", "var(--cyan-glow)");
@@ -627,7 +650,7 @@
             }
         }
 
-        // Auto Payment Verification
+        // Payment Verification Logic (/api/pay-verify)
         async function verifyPaymentAutomatically() {
             const txHash = document.getElementById('txHashInput').value.trim();
             const token = document.getElementById('botToken').value.trim();
@@ -646,7 +669,7 @@
             showCustomAlert("Auto Verifying", "Verifying Payment with Blockchain & Gateway...", "fa-arrows-rotate fa-spin", "var(--cyan-glow)");
 
             try {
-                const res = await fetch(`https://magic-scripts-admin-panel.vercel.app/api/pay-verify?tx=${txHash}&id=${botId}`);
+                const res = await fetch(`${DOMAIN}/api/pay-verify?tx=${txHash}&id=${botId}`);
                 const data = await res.json();
 
                 if (data.status === "verified" || data.success) {
@@ -654,7 +677,7 @@
                     setPremiumUIStatus(true);
                     showCustomAlert("Account Upgraded!", "Payment Verified automatically! Premium access activated.", "fa-circle-check", "var(--green-glow)");
                 } else {
-                    showCustomAlert("Payment Not Found", "Transaction ID is invalid or pending blockchain confirmation.", "fa-triangle-exclamation", "var(--red-glow)");
+                    showCustomAlert("Payment Not Found", data.message || "Transaction ID is invalid or pending blockchain confirmation.", "fa-triangle-exclamation", "var(--red-glow)");
                 }
             } catch (e) {
                 closePaymentModal();
@@ -663,7 +686,7 @@
             }
         }
 
-        // Custom Modal Alert Helpers
+        // Fixed Popups & Alert Modals Display Functions
         function showCustomAlert(title, desc, iconClass, iconColor) {
             document.getElementById('alertTitle').textContent = title;
             document.getElementById('alertDesc').textContent = desc;
@@ -674,19 +697,23 @@
             iconEl.className = `fa-solid ${iconClass || 'fa-circle-info'}`;
             iconWrap.style.color = iconColor || "var(--cyan-glow)";
             
-            document.getElementById('customAlertModal').classList.add('active');
+            const alertModal = document.getElementById('customAlertModal');
+            alertModal.classList.add('active');
         }
 
         function closeCustomAlert() {
-            document.getElementById('customAlertModal').classList.remove('active');
+            const alertModal = document.getElementById('customAlertModal');
+            alertModal.classList.remove('active');
         }
 
         function openPaymentModal() {
-            document.getElementById('paymentModal').classList.add('active');
+            const payModal = document.getElementById('paymentModal');
+            payModal.classList.add('active');
         }
 
         function closePaymentModal() {
-            document.getElementById('paymentModal').classList.remove('active');
+            const payModal = document.getElementById('paymentModal');
+            payModal.classList.remove('active');
         }
 
         function copyText(text) {
