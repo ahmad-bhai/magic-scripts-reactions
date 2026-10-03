@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Scripts - Reactions Bot Manager</title>
+    <title>Magic Scripts - Quantum Reaction Engine Pro</title>
     <link rel="shortcut icon" href="https://magic-scripts-reactions.vercel.app/logo.svg" type="image/x-icon">
     
     <!-- Font Awesome Pro Icons -->
@@ -103,7 +103,6 @@
         .tier-free { color: var(--text-muted); border-color: rgba(148, 163, 184, 0.3); }
         .tier-premium { color: var(--gold-glow); border-color: rgba(245, 158, 11, 0.5); background: rgba(245, 158, 11, 0.1); }
 
-        /* Premium Upgrade Button */
         .btn-upgrade {
             background: linear-gradient(135deg, var(--gold-glow) 0%, #d97706 100%);
             color: #fff;
@@ -125,7 +124,6 @@
             box-shadow: 0 0 25px rgba(245, 158, 11, 0.6);
         }
 
-        /* Hide Upgrade Button When Premium */
         .btn-upgrade.hidden-premium {
             display: none !important;
         }
@@ -239,7 +237,6 @@
 
         .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(6, 182, 212, 0.4); }
 
-        /* Modal Overlay System */
         .custom-modal-backdrop {
             position: fixed; 
             top: 0; 
@@ -438,13 +435,13 @@
                 <i class="fa-solid fa-shield-halved"></i> <span id="tierLabel">FREE MODE</span>
             </div>
             <button class="btn-upgrade" id="btnUpgradeHeader" onclick="openPaymentModal()">
-                <i class="fa-solid fa-crown"></i> UPGRADE
+                <i class="fa-solid fa-crown"></i> AUTO UPGRADE
             </button>
         </div>
 
         <div class="brand-logo">
             <img src="https://magic-scripts-reactions.vercel.app/logo.svg" alt="Magic Scripts Logo">
-            <h1>MAGIC SCRIPTS</h1>
+            <h1>MAGIC REACTION ENGINE</h1>
         </div>
 
         <form id="engineForm" onsubmit="event.preventDefault(); processScriptEngine();">
@@ -485,12 +482,12 @@
             </div>
 
             <button type="submit" class="btn-submit">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> RUN MAGIC
+                <i class="fa-solid fa-wand-magic-sparkles"></i> RUN ENGINE
             </button>
         </form>
     </div>
 
-    <!-- Alert Modal System -->
+    <!-- Custom Alert Modal -->
     <div class="custom-modal-backdrop" id="customAlertModal">
         <div class="custom-modal">
             <div class="modal-icon-wrap" id="alertIconWrap">
@@ -502,7 +499,7 @@
         </div>
     </div>
 
-    <!-- Payment Modal System -->
+    <!-- Payment Modal -->
     <div class="custom-modal-backdrop" id="paymentModal">
         <div class="custom-modal">
             <div class="modal-icon-wrap" style="color: var(--gold-glow); border-color: rgba(245, 158, 11, 0.3);">
@@ -523,9 +520,9 @@
                 <div class="pay-card">
                     <div class="pay-card-header">
                         <span class="pay-card-title"><i class="fa-solid fa-coins"></i> USDT (TRC20) Address</span>
-                        <button class="btn-copy" onclick="copyText('TLvd3Q1UpE8Cio8GxrqZzemSVWe8cH5Rxu')"><i class="fa-regular fa-copy"></i> Copy</button>
+                        <button class="btn-copy" onclick="copyText('mytrc')"><i class="fa-regular fa-copy"></i> Copy</button>
                     </div>
-                    <div class="pay-card-value">TLvd3Q1UpE8Cio8GxrqZzemSVWe8cH5Rxu</div>
+                    <div class="pay-card-value">mytrc</div>
                 </div>
             </div>
 
@@ -573,7 +570,7 @@
             localStorage.setItem('ms_toggle', toggle.checked);
         }
 
-        // Token Status Check via Express Backend /p?id= API
+        // Server Backend status check (/p?id=)
         async function checkTokenAccountStatus() {
             const token = document.getElementById('botToken').value.trim();
             if (!token || token.length < 10) return;
@@ -581,21 +578,29 @@
             localStorage.setItem('ms_token', token);
             const botId = token.split(':')[0];
 
+            // Local cache check for instant UI response
+            const localPremState = localStorage.getItem(`ms_prem_${botId}`);
+            if (localPremState === "true") {
+                setPremiumUIStatus(true);
+            }
+
             try {
                 const res = await fetch(`${DOMAIN}/p?id=${botId}`);
                 const data = await res.json();
 
                 if (data && (data.paidStatus === true || data.status === "paid" || data.premium === true)) {
+                    localStorage.setItem(`ms_prem_${botId}`, "true");
                     setPremiumUIStatus(true);
-                } else {
+                } else if (localPremState !== "true") {
                     setPremiumUIStatus(false);
                 }
             } catch (e) {
-                setPremiumUIStatus(false);
+                if (localPremState !== "true") {
+                    setPremiumUIStatus(false);
+                }
             }
         }
 
-        // UI Updates: Premium Active Ho Toh Hide Button, Expire Pe Show Button
         function setPremiumUIStatus(isPrem) {
             isPremiumUser = isPrem;
             const badge = document.getElementById('userTierDisplay');
@@ -606,17 +611,16 @@
             if (isPrem) {
                 badge.className = "badge-status tier-premium";
                 label.textContent = "PREMIUM ENGINE UNLOCKED";
-                overlay.style.display = "none"; // Unlock FSub input field
-                upgradeBtn.classList.add('hidden-premium'); // Hide AUTO UPGRADE button
+                overlay.style.display = "none";
+                upgradeBtn.classList.add('hidden-premium');
             } else {
                 badge.className = "badge-status tier-free";
                 label.textContent = "FREE MODE";
-                overlay.style.display = "flex"; // Lock FSub input field
-                upgradeBtn.classList.remove('hidden-premium'); // Show AUTO UPGRADE button again
+                overlay.style.display = "flex";
+                upgradeBtn.classList.remove('hidden-premium');
             }
         }
 
-        // Run Main Engine /api
         async function processScriptEngine() {
             const token = document.getElementById('botToken').value.trim();
             const status = document.getElementById('toggleStatus').checked;
@@ -650,7 +654,7 @@
             }
         }
 
-        // Payment Verification Logic (/api/pay-verify)
+        // Strict Auto-Payment Verification API Logic
         async function verifyPaymentAutomatically() {
             const txHash = document.getElementById('txHashInput').value.trim();
             const token = document.getElementById('botToken').value.trim();
@@ -669,24 +673,29 @@
             showCustomAlert("Auto Verifying", "Verifying Payment with Blockchain & Gateway...", "fa-arrows-rotate fa-spin", "var(--cyan-glow)");
 
             try {
-                const res = await fetch(`${DOMAIN}/api/pay-verify?tx=${txHash}&id=${botId}`);
+                const res = await fetch(`${DOMAIN}/api/pay-verify?tx=${encodeURIComponent(txHash)}&id=${encodeURIComponent(botId)}`);
+                
+                if (!res.ok) {
+                    throw new Error("Server response error");
+                }
+
                 const data = await res.json();
 
-                if (data.status === "verified" || data.success) {
+                if (data.status === "verified" || data.success === true || data.paidStatus === true) {
+                    localStorage.setItem(`ms_prem_${botId}`, "true");
                     closePaymentModal();
                     setPremiumUIStatus(true);
-                    showCustomAlert("Account Upgraded!", "Payment Verified automatically! Premium access activated.", "fa-circle-check", "var(--green-glow)");
+                    showCustomAlert("Account Upgraded!", "Payment Verified successfully! Premium access activated.", "fa-circle-check", "var(--green-glow)");
                 } else {
-                    showCustomAlert("Payment Not Found", data.message || "Transaction ID is invalid or pending blockchain confirmation.", "fa-triangle-exclamation", "var(--red-glow)");
+                    closePaymentModal();
+                    showCustomAlert("Payment Failed", data.message || "Invalid Transaction ID or Payment not received yet.", "fa-triangle-exclamation", "var(--red-glow)");
                 }
             } catch (e) {
                 closePaymentModal();
-                setPremiumUIStatus(true);
-                showCustomAlert("Instant Upgrade", "Payment verified automatically! Premium Engine activated.", "fa-crown", "var(--gold-glow)");
+                showCustomAlert("Verification Failed", "Unable to verify TxID with server. Please check your network and TxID.", "fa-triangle-exclamation", "var(--red-glow)");
             }
         }
 
-        // Fixed Popups & Alert Modals Display Functions
         function showCustomAlert(title, desc, iconClass, iconColor) {
             document.getElementById('alertTitle').textContent = title;
             document.getElementById('alertDesc').textContent = desc;
@@ -697,23 +706,19 @@
             iconEl.className = `fa-solid ${iconClass || 'fa-circle-info'}`;
             iconWrap.style.color = iconColor || "var(--cyan-glow)";
             
-            const alertModal = document.getElementById('customAlertModal');
-            alertModal.classList.add('active');
+            document.getElementById('customAlertModal').classList.add('active');
         }
 
         function closeCustomAlert() {
-            const alertModal = document.getElementById('customAlertModal');
-            alertModal.classList.remove('active');
+            document.getElementById('customAlertModal').classList.remove('active');
         }
 
         function openPaymentModal() {
-            const payModal = document.getElementById('paymentModal');
-            payModal.classList.add('active');
+            document.getElementById('paymentModal').classList.add('active');
         }
 
         function closePaymentModal() {
-            const payModal = document.getElementById('paymentModal');
-            payModal.classList.remove('active');
+            document.getElementById('paymentModal').classList.remove('active');
         }
 
         function copyText(text) {
